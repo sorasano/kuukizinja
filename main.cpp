@@ -614,6 +614,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 	}
 
+	////3dオブジェクトの配列
+	//Object3d playerObj;
+	//InitializeObject3d(&playerObj, device);
+
 
 	//座標変換
 
@@ -654,7 +658,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ScratchImage scratchImg{};
 	// WICテクスチャのロード
 	result = LoadFromWICFile(
-		L"Resources/pengin.jpg",   //「Resources」フォルダの「texture.png」
+		L"Resources/paperAirplane.png",   //「Resources」フォルダの「texture.png」
 		WIC_FLAGS_NONE,
 		&metadata, scratchImg);
 
@@ -723,7 +727,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ScratchImage scratchImg2{};
 	// WICテクスチャのロード
 	result = LoadFromWICFile(
-		L"Resources/reimu.png",   //「Resources」フォルダの「texture.png」
+		L"Resources/paperCircle.png",   //「Resources」フォルダの「texture.png」
 		WIC_FLAGS_NONE,
 		&metadata2, scratchImg2);
 
@@ -1000,6 +1004,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			UpdateObject3d(&object3ds[i], matView, matProjection);
 		}
 
+		//updateObject
 
 		if (input->TriggerKey(DIK_SPACE)) {
 			if (incrementSize != 0) {
@@ -1088,6 +1093,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		for (int i = 0; i < _countof(object3ds); i++) {
 			DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
 		}
+
+		////自機描画
+		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
 
 		// ４．描画コマンドここまで
 
