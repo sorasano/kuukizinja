@@ -30,6 +30,11 @@ using namespace std;
 
 #include "WinApp.h"
 
+#include "math/Vector3.h"
+#include "math/Matrix4.h"
+
+#include <list>
+
 // 定数バッファ用データ構造体（マテリアル）
 struct ConstBufferDataMaterial {
 	XMFLOAT4 color; // 色 (RGBA)
@@ -63,6 +68,238 @@ void InitializeObject3d(Object3d* object, ComPtr<ID3D12Device> device);
 void UpdateObject3d(Object3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
 void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+
+//---------------自機-----------------
+
+struct PlayerObject3d {
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	//扇風機の状態 0停止 1右 2左 3発射後1フレーム 4その後
+	int mode = 1;
+
+	//キャラクターの移動速さ
+	const float speed = 0.2f;
+
+	//移動限界距離
+	int moveLimitLeft = -30;
+	int moveLimitRight = 30;
+
+	//風量
+	float windPower = 0;
+	//風量の上昇量
+	float powerSpeed = 0.1;
+	//風量の限界値
+	float maxPower = 10;
+
+	int push = 0;
+
+	int keyCoolTime = 100;
+
+	////弾
+	//std::list<std::unique_ptr<PlayerBulletObject3d>> bullets_;
+};
+//-------------------自機弾------------------
+
+struct PlayerBulletObject3d {
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+	//速度
+	Vector3 velocity_;
+
+	//寿命
+	static const int32_t kLifeTime = 60 * 5;
+	//デスタイマー
+	int32_t deathTimer_ = kLifeTime;
+	//デスフラグ
+	bool isDead_ = false;
+
+};
+
+//---------------自機-----------------
+
+
+//初期化
+void PlayerInitialize(PlayerObject3d* object, ComPtr<ID3D12Device> device);
+
+//更新
+void PlayerUpdate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device, PlayerBulletObject3d playerBulletObj);
+
+//描画
+void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+
+//旋回
+void PlayerRotate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
+
+//攻撃
+void PlayerAttack(Input* input_, PlayerObject3d* object, ComPtr<ID3D12Device> device, PlayerBulletObject3d playerBulletObj);
+
+//移動
+void PlayerMove(PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
+
+//mode変更
+void PlayerModeChange(PlayerObject3d* object);
+
+//風量ゲージ(パワーを測る)
+void PlayermeasureWindPower(PlayerObject3d* object);
+
+//衝突したら呼び出されるコールバック関数
+void PlayerOnCollision();
+
+void PlayerReset(PlayerObject3d* object);
+
+void PlayerSetMode(int i, PlayerObject3d* object);
+
+////-------------------自機弾------------------
+
+
+void PlayerBulletInitialize(PlayerBulletObject3d* object, ComPtr<ID3D12Device> device, Vector3& position, Vector3& velocity);
+
+void PlayerBulletUpdate(PlayerBulletObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
+
+void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+
+bool PlayerBulletIsDead(PlayerBulletObject3d* object) { return  object->isDead_; }
+
+//衝突したら呼び出されるコールバック関数
+void PlayerBullletOnCollision(PlayerBulletObject3d* object);
+
+//------------紙----------------
+
+struct PaperObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	int paperFlag = 0;
+
+	//あったったか
+	int paperIsCol[10] = {};
+
+	//座標
+	Vector3 paperTrans[10] = {};
+	//角度
+	Vector3 paperRot[10] = {};
+
+	//飛行機型か丸型か
+	int paperType[10] = { 0,0,1,0,0,1,0,0,1,0 };//0飛行機 1丸
+
+	//落下したか
+	int paperIsLanding[10] = {};
+
+	//変わらない値(統一)
+	float paperTransY = 0;
+	float paperTransZ = 5;
+
+	float paperRotX = 0;
+	float paperRotZ = 0;
+
+	//配置する位置の端
+	float paperMaxLeft = -30.0f;
+	float paperMaxRight = 20.0f;
+
+	//配置する最大間隔
+	float paperSpace = 4.0f;
+
+	//回転差
+	float paperRotdiff = 6;
+
+	//前の座標
+	float paperBeforeTrans = 0;
+
+	//サイズ
+	int paperSize = 4.5;
+
+};
+
+struct PaperAirplaneObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	//0 停止 1 移動
+	int paperAirplaneMove = 0;
+	//統合スピード
+	Vector3 paperAirplaneVelocity = { 0,0,0 };
+
+	float paperAirplaneEndY = -20;
+	bool paperAirplaneIsLanding = 0;
+	//通常スピード
+	float paperAirplaneSpeed = 0.1;
+
+	//落下スピード
+	float paperAirplaneFallSpeed = 0.1;
+
+	//減速率
+	float paperAirplaneDecelerationRate = 0.001;
+};
+
+struct PaperCircleObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+	//0 停止 1 移動
+	int paperCircleMove = 0;
+
+	//統合スピード
+	Vector3 paperCircleVelocity = { 0,0,0 };
+
+	float paperCircleEndY = -20;
+	bool paperCircleIsLanding = 0;
+
+	//通常スピード
+	float paperCircleSpeed = 0.1;
+
+	//落下スピード
+	float paperCircleFallSpeed = 0.1;
+
+	//減速率
+	float paperCircleDecelerationRate = 0.001;
+
+
+};
+
 // ウィンドウプロシージャ
 LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	// メッセージに応じてゲーム固有の処理を行う
@@ -308,6 +545,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		XMFLOAT3 normal; //法線ベクトル
 		XMFLOAT2 uv;  // uv座標
 	};
+
 	// 頂点データ
 	Vertex vertices[] = {
 		// x      y     z     法線  u     v
@@ -614,10 +852,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 	}
 
-	////3dオブジェクトの配列
-	//Object3d playerObj;
-	//InitializeObject3d(&playerObj, device);
+	//------自機の初期化--------
+	PlayerObject3d playerObj;
+	PlayerInitialize(&playerObj, device);
 
+	//--------自機弾初期化---------
+	PlayerBulletObject3d playerBulletObj;
+
+	//PlayerBulletInitialize(&playerBulletObj, device);
+
+	////---------紙初期化---------
+	//Object3d paperObj;
+	//InitializeObject3d(&paperObj, device);
+
+	////---------紙飛行機初期化---------
+	//
+	//Object3d paperAirplaneObj;
+	//InitializeObject3d(&paperAirplaneObj, device);
+
+	////---------丸紙初期化---------
+	//
+	//Object3d paperCircleObj;
+	//InitializeObject3d(&paperCircleObj, device);
 
 	//座標変換
 
@@ -960,7 +1216,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ゲームループ
 	while (true) {
-		
+
 		//Windowsのメッセージ処理
 		if (winApp->processMessage()) {
 			//ゲームループを抜ける
@@ -989,31 +1245,53 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		//平行移動更新
 
-		if (input->PushKey(DIK_UP) || input->PushKey(DIK_DOWN) || input->PushKey(DIK_RIGHT) || input->PushKey(DIK_LEFT)) {
+		//if (input->PushKey(DIK_UP) || input->PushKey(DIK_DOWN) || input->PushKey(DIK_RIGHT) || input->PushKey(DIK_LEFT)) {
 
-			//座標を移動する処理(Z座標)
-			if (input->PushKey(DIK_UP)) { object3ds[0].position.y += 1.0f; }
-			else if (input->PushKey(DIK_DOWN)) { object3ds[0].position.y -= 1.0f; }
-			if (input->PushKey(DIK_RIGHT)) { object3ds[0].position.x += 1.0f; }
-			else if (input->PushKey(DIK_LEFT)) { object3ds[0].position.x -= 1.0f; }
+		//	//座標を移動する処理(Z座標)
+		//	if (input->PushKey(DIK_UP)) { object3ds[0].position.y += 1.0f; }
+		//	else if (input->PushKey(DIK_DOWN)) { object3ds[0].position.y -= 1.0f; }
+		//	if (input->PushKey(DIK_RIGHT)) { object3ds[0].position.x += 1.0f; }
+		//	else if (input->PushKey(DIK_LEFT)) { object3ds[0].position.x -= 1.0f; }
+
+		//}
+
+
+		//for (size_t i = 0; i < _countof(object3ds); i++) {
+		//	UpdateObject3d(&object3ds[i], matView, matProjection);
+		//}
+
+		//UpdateObject3d(&playerObj, matView, matProjection);
+		PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj);
+
+		//弾
+
+		if (playerObj.mode == 0) {
+
+			//弾の速度
+			const float kBulletSpeed = 1.0f;
+			Vector3 velocity(0, 0, kBulletSpeed);
+
+			//速度ベクトルを自機の向きに合わせて回転させる
+			velocity = transform(velocity, rotateX(playerBulletObj.rotation.x));
+
+			Vector3 pos(playerObj.position.x, playerObj.position.y, playerObj.position.z);
+
+			//弾を生成し初期化
+			PlayerBulletInitialize(&playerBulletObj, device, pos, velocity);
 
 		}
-
-
-		for (size_t i = 0; i < _countof(object3ds); i++) {
-			UpdateObject3d(&object3ds[i], matView, matProjection);
+		else if (playerObj.mode == 3) {
+			PlayerBulletUpdate(&playerBulletObj, matView, matProjection);
 		}
 
-		//updateObject
-
-		if (input->TriggerKey(DIK_SPACE)) {
-			if (incrementSize != 0) {
-				incrementSize = 0;
-			}
-			else {
-				incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			}
-		}
+		//if (input->TriggerKey(DIK_SPACE)) {
+		//	if (incrementSize != 0) {
+		//		incrementSize = 0;
+		//	}
+		//	else {
+		//		incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//	}
+		//}
 
 
 		//更新処理-ここまで
@@ -1096,6 +1374,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		////自機描画
 		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
+
+		PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices));
+		if (playerObj.mode == 3) {
+			PlayerBulletDraw(&playerBulletObj, commandList, vbView, ibView, _countof(indices));
+		}
 
 		// ４．描画コマンドここまで
 
@@ -1221,3 +1504,340 @@ void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandLis
 	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
 
 }
+
+//---------------自機----------------------------
+
+//初期化
+void PlayerInitialize(PlayerObject3d* object, ComPtr<ID3D12Device> device) {
+
+	HRESULT result;
+
+	// ヒープ設定
+	D3D12_HEAP_PROPERTIES cbHeapProp{};
+	cbHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;                   // GPUへの転送用
+	// リソース設定
+	D3D12_RESOURCE_DESC resdesc{};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff;   // 256バイトアラインメント
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&object->constBuffTransform));
+	assert(SUCCEEDED(result));
+
+	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
+	assert(SUCCEEDED(result));
+}
+
+//更新
+void PlayerUpdate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device, PlayerBulletObject3d playerBulletObj) {
+
+	////デスフラグの立った球を削除
+	//bullets_.remove_if([](std::unique_ptr<FanWind>& bullet) {
+	//	return bullet->IsDead();
+	//	});
+
+	PlayerMove(object, matView, matProjection);
+	//debugText_->SetPos(0, 0);
+	//debugText_->Printf("FanPos(%f,%f,%f)", worldtransform_.translation_.x, worldtransform_.translation_.y, worldtransform_.translation_.z);
+	//debugText_->SetPos(0, 20);
+	//debugText_->Printf("power = %f", windPower);
+
+	PlayerRotate(input_, object, matView, matProjection);
+
+	//キャラクター攻撃処理
+	PlayerAttack(input_, object, device, playerBulletObj);
+
+	////弾更新
+	//for (std::unique_ptr<FanWind>& bullet : bullets_) {
+	//	bullet->Update();
+	//}
+
+	XMMATRIX matScale, matRot, matTrans;
+
+	//スケール,回転,平行移動行列の計算
+	matScale = XMMatrixScaling(object->scale.x, object->scale.y, object->scale.z);
+	//回転角
+	matRot = XMMatrixIdentity();
+	matRot *= XMMatrixRotationZ(object->rotation.z);
+	matRot *= XMMatrixRotationX(object->rotation.x);
+	matRot *= XMMatrixRotationY(object->rotation.y);
+	//座標
+	matTrans = XMMatrixTranslation(object->position.x, object->position.y, object->position.z);
+
+	//ワールド行列の合成
+	object->matWorld = XMMatrixIdentity();
+	object->matWorld *= matScale;
+	object->matWorld *= matRot;
+	object->matWorld *= matTrans;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+
+};
+
+//描画
+void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+
+	// 頂点バッファビューの設定コマンド
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
+
+	// 定数バッファビュー(CBV)の設定コマンド
+	commandList->SetGraphicsRootConstantBufferView(2, object->constBuffTransform->GetGPUVirtualAddress());
+
+	// 描画コマンド
+	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+
+	////弾描画
+	//for (std::unique_ptr<FanWind>& bullet : bullets_) {
+	//	bullet->Draw(viewProjection_);
+	//}
+}
+
+void PlayerRotate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+
+	//キャラクターの移動ベクトル
+	Vector3 rot = { 0.0f,0.0f,0.0f };
+
+	//キャラクターの移動速さ
+	const float rotY = 0.01f;
+
+	//移動ベクトルの変更
+	if (input_->PushKey(DIK_R)) {
+		rot = { 0.0f,rotY,0.0f };
+	}
+	else if (input_->PushKey(DIK_T)) {
+		rot = { 0.0f,-rotY,0.0f };
+	}
+
+	//ベクトルの加算
+
+	object->rotation.x += rot.x;
+	object->rotation.y += rot.y;
+	object->rotation.z += rot.z;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+
+	//debugText_->SetPos(0, 20);
+	//debugText_->Printf("FanRot(%f,%f,%f)", worldtransform_.rotation_.x, worldtransform_.rotation_.y, worldtransform_.rotation_.z);
+
+
+};
+
+void PlayerAttack(Input* input_, PlayerObject3d* object, ComPtr<ID3D12Device> device, PlayerBulletObject3d playerBulletObj) {
+
+	object->keyCoolTime--;
+
+	if (input_->PushKey(DIK_SPACE) && object->keyCoolTime <= 0) {
+
+		object->push = 1;
+
+		if (object->mode != 0 && object->mode != 4) {
+			object->mode = 0;
+			object->windPower = 0;
+		}
+	}
+	else {
+		object->push = 0;
+	}
+
+	//debugText_->SetPos(0, 100);
+	//debugText_->Printf("%d", push);
+
+	//停止中にゲージを付ける
+	if (object->mode == 0) {
+		PlayermeasureWindPower(object);
+	}
+
+
+	if (object->mode == 0 && object->push == 0) {
+
+		object->mode = 3;
+
+	}
+
+}
+
+void PlayerOnCollision() {
+
+}
+
+void PlayerReset(PlayerObject3d* object)
+{
+	////ワールド変換初期化
+	//worldtransform_.translation_ = Vector3(0,0,0);
+	//worldtransform_.matWorld_ = affine_->World(affine_->Scale(affine_->Scale_), affine_->Rot(affine_->RotX(worldtransform_.rotation_.x), affine_->RotY(worldtransform_.rotation_.y), affine_->RotZ(worldtransform_.rotation_.z)), affine_->Trans(worldtransform_.translation_));
+	//worldtransform_.TransferMatrix();
+	////ワールド変換初期化
+	//worldtransform_.Initialize();
+
+	object->mode = 1;
+	object->push = 0;
+	object->keyCoolTime = 100;
+
+}
+
+void PlayerSetMode(int i, PlayerObject3d* object)
+{
+	object->mode = i;
+}
+
+void PlayerMove(PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+	PlayerModeChange(object);
+
+	//キャラクターの移動ベクトル
+	Vector3 move = { 0.0f,0.0f,0.0f };
+
+	//移動ベクトルの変更
+	if (object->mode == 1) {
+		move = { (-object->speed),0,0 };
+	}
+	else if (object->mode == 2) {
+		move = { object->speed,0,0 };
+	}
+
+	//ベクトルの加算
+	object->position.x += move.x;
+	object->position.y += move.y;
+	object->position.z += move.z;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+
+}
+
+void PlayerModeChange(PlayerObject3d* object) {
+
+	//プレイヤーの座標が限界値に行ったら向きを変更する
+	if (object->position.x <= object->moveLimitLeft) {
+		object->mode = 2;
+	}
+	else if (object->position.x >= object->moveLimitRight) {
+		object->mode = 1;
+	}
+
+}
+
+
+void PlayermeasureWindPower(PlayerObject3d* object) {
+
+	if (object->windPower >= object->maxPower) {
+		object->windPower = 0;
+	}
+
+	object->windPower += object->powerSpeed;
+
+}
+
+//-----------------自機弾-------------
+
+void PlayerBulletInitialize(PlayerBulletObject3d* object, ComPtr<ID3D12Device> device, Vector3& position, Vector3& velocity) {
+
+	object->velocity_.x = velocity.x;
+	object->velocity_.y = velocity.y;
+	object->velocity_.z = velocity.z;
+
+	object->position.x = position.x;
+	object->position.y = position.y;
+	object->position.z = position.z;
+
+
+	HRESULT result;
+
+	// ヒープ設定
+	D3D12_HEAP_PROPERTIES cbHeapProp{};
+	cbHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;                   // GPUへの転送用
+	// リソース設定
+	D3D12_RESOURCE_DESC resdesc{};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff;   // 256バイトアラインメント
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&object->constBuffTransform));
+	assert(SUCCEEDED(result));
+
+	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
+	assert(SUCCEEDED(result));
+}
+
+void PlayerBulletUpdate(PlayerBulletObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+	//座標を移動させる
+	//ベクトルの加算
+	object->position.x += object->velocity_.x;
+	object->position.y += object->velocity_.y;
+	object->position.z += object->velocity_.z;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+
+	if (-(object->deathTimer_) <= 0) {
+		object->isDead_ = true;
+	}
+
+	XMMATRIX matScale, matRot, matTrans;
+
+	//スケール,回転,平行移動行列の計算
+	matScale = XMMatrixScaling(object->scale.x, object->scale.y, object->scale.z);
+	//回転角
+	matRot = XMMatrixIdentity();
+	matRot *= XMMatrixRotationZ(object->rotation.z);
+	matRot *= XMMatrixRotationX(object->rotation.x);
+	matRot *= XMMatrixRotationY(object->rotation.y);
+	//座標
+	matTrans = XMMatrixTranslation(object->position.x, object->position.y, object->position.z);
+
+	//ワールド行列の合成
+	object->matWorld = XMMatrixIdentity();
+	object->matWorld *= matScale;
+	object->matWorld *= matRot;
+	object->matWorld *= matTrans;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+}
+
+void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+
+	// 頂点バッファビューの設定コマンド
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
+
+	// 定数バッファビュー(CBV)の設定コマンド
+	commandList->SetGraphicsRootConstantBufferView(2, object->constBuffTransform->GetGPUVirtualAddress());
+
+	// 描画コマンド
+	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+}
+
+//衝突したら呼び出されるコールバック関数
+void PlayerBullletOnCollision(PlayerBulletObject3d* object);

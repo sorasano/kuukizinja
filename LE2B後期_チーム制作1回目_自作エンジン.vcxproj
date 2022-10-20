@@ -153,10 +153,14 @@
   <ItemGroup>
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="math\Matrix4.cpp" />
+    <ClCompile Include="math\Vector3.cpp" />
     <ClCompile Include="WinApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Input.h" />
+    <ClInclude Include="math\Matrix4.h" />
+    <ClInclude Include="math\Vector3.h" />
     <ClInclude Include="WinApp.h" />
   </ItemGroup>
   <ItemGroup>
