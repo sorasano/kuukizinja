@@ -35,6 +35,10 @@ using namespace std;
 
 #include <list>
 
+#include <random>
+
+const double PI = 3.141592653589;
+
 // 定数バッファ用データ構造体（マテリアル）
 struct ConstBufferDataMaterial {
 	XMFLOAT4 color; // 色 (RGBA)
@@ -87,11 +91,11 @@ struct PlayerObject3d {
 	int mode = 1;
 
 	//キャラクターの移動速さ
-	const float speed = 0.2f;
+	const float speed = 0.6f;
 
 	//移動限界距離
-	int moveLimitLeft = -30;
-	int moveLimitRight = 30;
+	int moveLimitLeft = -110;
+	int moveLimitRight = 110;
 
 	//風量
 	float windPower = 0;
@@ -102,7 +106,7 @@ struct PlayerObject3d {
 
 	int push = 0;
 
-	int keyCoolTime = 100;
+	int keyCoolTime = 10;
 
 	////弾
 	//std::list<std::unique_ptr<PlayerBulletObject3d>> bullets_;
@@ -131,9 +135,133 @@ struct PlayerBulletObject3d {
 	bool isDead_ = false;
 
 };
+//------------紙----------------
+
+struct PaperObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	int flag = 0;
+
+	//あったったか
+	int isCol[10] = {};
+
+	//座標
+	Vector3 trans[10] = {};
+	//角度
+	Vector3 rot[10] = {};
+
+	//飛行機型か丸型か
+	int type[10] = { 0,0,1,0,0,1,0,0,1,0 };//0飛行機 1丸
+
+	//落下したか
+	int isLanding_[10] = {};
+
+	//変わらない値(統一)
+	float transY = 0;
+	float transZ = 30;
+
+	float rotX = 0;
+	float rotZ = 0;
+
+	//配置する位置の端
+	float maxLeft = -95.0f;
+	float maxRight = 95.0f;
+
+	//配置する最大間隔
+	float space = 3.0f;
+
+	//回転差
+	float rotdiff = 6;
+
+	//前の座標
+	float beforeTrans = 0;
+
+	//サイズ
+	int size = 20.0f;
+
+};
+
+//-------------紙飛行機-------------
+
+struct PaperAirplaneObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	//0 停止 1 移動
+	int move = 0;
+
+	//統合スピード
+	Vector3 velocity_ = { 0,0,0 };
+
+	float endY = -20;
+	bool isLanding = 0;
+
+	//通常スピード
+	float speed = 0.1;
+
+	//落下スピード
+	float fallSpeed = 0.1;
+
+	//減速率
+	float decelerationRate = 0.001;
+};
+
+//---------------丸紙-----------------
+
+
+struct PaperCircleObject3d {
+
+	//定数バッファ行列用
+	ComPtr<ID3D12Resource> constBuffTransform;
+	//定数バッファマップ行列用
+	ConstBufferDataTransform* constMapTransform = nullptr;
+	//アフィン変換情報
+	XMFLOAT3 scale = { 1,1,1 };
+	XMFLOAT3 rotation = { 0,0,0 };
+	XMFLOAT3 position = { 0,0,0 };
+	//ワールド変換行列
+	XMMATRIX matWorld = {};
+
+	//0 停止 1 移動
+	int move = 0;
+
+	//統合スピード
+	Vector3 velocity_ = { 0,0,0 };
+
+	float endY = -20;
+	bool isLanding = 0;
+
+	//通常スピード
+	float speed = 0.1;
+
+	//落下スピード
+	float fallSpeed = 0.1;
+
+	//減速率
+	float decelerationRate = 0.001;
+
+};
 
 //---------------自機-----------------
-
 
 //初期化
 void PlayerInitialize(PlayerObject3d* object, ComPtr<ID3D12Device> device);
@@ -182,123 +310,73 @@ void PlayerBullletOnCollision(PlayerBulletObject3d* object);
 
 //------------紙----------------
 
-struct PaperObject3d {
+void PaperInitialize(PaperObject3d* object, ComPtr<ID3D12Device> device);
 
-	//定数バッファ行列用
-	ComPtr<ID3D12Resource> constBuffTransform;
-	//定数バッファマップ行列用
-	ConstBufferDataTransform* constMapTransform = nullptr;
-	//アフィン変換情報
-	XMFLOAT3 scale = { 1,1,1 };
-	XMFLOAT3 rotation = { 0,0,0 };
-	XMFLOAT3 position = { 0,0,0 };
-	//ワールド変換行列
-	XMMATRIX matWorld = {};
+void PaperUpdate(PaperObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-	int paperFlag = 0;
+void PaperDraw(PaperObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
 
-	//あったったか
-	int paperIsCol[10] = {};
+//配置
+void PaperSet(PaperObject3d* object);
 
-	//座標
-	Vector3 paperTrans[10] = {};
-	//角度
-	Vector3 paperRot[10] = {};
+//座標配置
+void PaperSetTrans(int i, PaperObject3d* object);
 
-	//飛行機型か丸型か
-	int paperType[10] = { 0,0,1,0,0,1,0,0,1,0 };//0飛行機 1丸
+//角度配置
+void PaperSetRot(int i, PaperObject3d* object);
 
-	//落下したか
-	int paperIsLanding[10] = {};
+void PaperSetIsCol(int i, PaperObject3d* object);
 
-	//変わらない値(統一)
-	float paperTransY = 0;
-	float paperTransZ = 5;
+void PaperOnCollision(int i, float windPower, Vector3 fanTrans, PaperObject3d* object);
 
-	float paperRotX = 0;
-	float paperRotZ = 0;
+void PaperReset(PaperObject3d* object);
 
-	//配置する位置の端
-	float paperMaxLeft = -30.0f;
-	float paperMaxRight = 20.0f;
+//------------紙飛行機-----------------
 
-	//配置する最大間隔
-	float paperSpace = 4.0f;
+void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection,ComPtr<ID3D12Device> device);
 
-	//回転差
-	float paperRotdiff = 6;
+void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-	//前の座標
-	float paperBeforeTrans = 0;
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
-	//サイズ
-	int paperSize = 4.5;
+//衝突したら呼び出されるコールバック関数
+void PaperAirplaneOnCollision(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object);
 
-};
+//速度計さん
+void PaperAirplaneCalculationSpeed(PaperAirplaneObject3d* object);
 
-struct PaperAirplaneObject3d {
+void PaperAirplaneMove(PaperAirplaneObject3d* object);
 
-	//定数バッファ行列用
-	ComPtr<ID3D12Resource> constBuffTransform;
-	//定数バッファマップ行列用
-	ConstBufferDataTransform* constMapTransform = nullptr;
-	//アフィン変換情報
-	XMFLOAT3 scale = { 1,1,1 };
-	XMFLOAT3 rotation = { 0,0,0 };
-	XMFLOAT3 position = { 0,0,0 };
-	//ワールド変換行列
-	XMMATRIX matWorld = {};
+//速度などをセット
+void PaperAirplaneSet(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object);
 
-	//0 停止 1 移動
-	int paperAirplaneMove = 0;
-	//統合スピード
-	Vector3 paperAirplaneVelocity = { 0,0,0 };
+//着地してるかしてないか
+void PaperAirplaneLandingJudge(PaperAirplaneObject3d* object);
 
-	float paperAirplaneEndY = -20;
-	bool paperAirplaneIsLanding = 0;
-	//通常スピード
-	float paperAirplaneSpeed = 0.1;
+void PaperAirplaneReset(PaperAirplaneObject3d* object);
+//------------丸紙-----------------
 
-	//落下スピード
-	float paperAirplaneFallSpeed = 0.1;
+void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device);
 
-	//減速率
-	float paperAirplaneDecelerationRate = 0.001;
-};
+void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-struct PaperCircleObject3d {
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
-	//定数バッファ行列用
-	ComPtr<ID3D12Resource> constBuffTransform;
-	//定数バッファマップ行列用
-	ConstBufferDataTransform* constMapTransform = nullptr;
-	//アフィン変換情報
-	XMFLOAT3 scale = { 1,1,1 };
-	XMFLOAT3 rotation = { 0,0,0 };
-	XMFLOAT3 position = { 0,0,0 };
+//衝突したら呼び出されるコールバック関数
+void PaperCircleOnCollision(float windPower, Vector3 fanTrans, PaperCircleObject3d* object);
 
-	//ワールド変換行列
-	XMMATRIX matWorld = {};
-	//0 停止 1 移動
-	int paperCircleMove = 0;
+//速度計さん
+void PaperCircleCalculationSpeed(PaperCircleObject3d* object);
 
-	//統合スピード
-	Vector3 paperCircleVelocity = { 0,0,0 };
+void PaperCircleMove(PaperCircleObject3d* object);
 
-	float paperCircleEndY = -20;
-	bool paperCircleIsLanding = 0;
+//速度などをセット
+void PaperCircleSet(float windPower, Vector3 fanTrans, PaperCircleObject3d* object);
 
-	//通常スピード
-	float paperCircleSpeed = 0.1;
+//着地してるかしてないか
+void PaperCircleLandingJudge(PaperCircleObject3d* object);
 
-	//落下スピード
-	float paperCircleFallSpeed = 0.1;
-
-	//減速率
-	float paperCircleDecelerationRate = 0.001;
-
-
-};
+void PaperCircleReset(PaperCircleObject3d* object);
 
 // ウィンドウプロシージャ
 LRESULT WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
@@ -574,16 +652,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
 
 		//下
-		{{-5.0f,-5.0f, -5.0f}, {},{0.0f, 1.0f}}, // 左下
-		{{-5.0f, -5.0f, 5.0f}, {},{0.0f, 0.0f}}, // 左上
-		{{5.0f, -5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
-		{{5.0f, -5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{-5.0f,5.0f, -5.0f}, {},{0.0f, 1.0f}}, // 左下
+		{{-5.0f, 5.0f, 5.0f}, {},{0.0f, 0.0f}}, // 左上
+		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
+		{{5.0f, 5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
 
 		//上
-		{{-5.0f, 5.0f, 5.0f},{}, {0.0f, 0.0f}}, // 左上
-		{{-5.0f,5.0f, -5.0f}, {},{0.0f, 1.0f}}, // 左下
-		{{5.0f, 5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
-		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
+		{{-5.0f, -5.0f, -5.0f},{}, {0.0f, 0.0f}}, // 左上
+		{{-5.0f, -5.0f, 5.0f},{}, {0.0f, 0.0f}}, // 左下
+		{{5.0f, -5.0f,  -5.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{5.0f, -5.0f, 5.0f},{}, {1.0f, 0.0f}}, // 右下
 
 	};
 
@@ -861,19 +939,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	//PlayerBulletInitialize(&playerBulletObj, device);
 
-	////---------紙初期化---------
-	//Object3d paperObj;
-	//InitializeObject3d(&paperObj, device);
+	//---------紙初期化---------
 
-	////---------紙飛行機初期化---------
-	//
-	//Object3d paperAirplaneObj;
-	//InitializeObject3d(&paperAirplaneObj, device);
+	//3Dオブジェクトの数
+	const size_t paperObjCount = 10;
+	//3dオブジェクトの配列
+	PaperObject3d  paperObj;
 
-	////---------丸紙初期化---------
-	//
-	//Object3d paperCircleObj;
-	//InitializeObject3d(&paperCircleObj, device);
+	////配列内の全オブジェクトに対して
+	//for (int i = 0; i < _countof(paperObjs); i++) {
+	//	//初期化
+		PaperInitialize(&paperObj, device);
+	//}
+	//---------紙飛行機初期化---------
+
+	//3dオブジェクトの配列
+	PaperAirplaneObject3d  paperAirplaneObjs[paperObjCount];
+
+	//配列内の全オブジェクトに対して
+	//for (int i = 0; i < _countof(paperAirplaneObjs); i++) {
+	//	//初期化
+	//	PaperAirplaneInitialize(paperAirplaneObjs, device);
+	//}
+
+	//---------丸紙初期化---------
+
+	//3dオブジェクトの配列
+	PaperCircleObject3d paperCircleObjs[paperObjCount];
+
+	//配列内の全オブジェクトに対して
+	//for (int i = 0; i < _countof(paperCircleObjs); i++) {
+	//	//初期化
+	//	PaperCircleInitialize(paperCircleObjs, device);
+	//}
+
 
 	//座標変換
 
@@ -898,7 +997,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	//ビュー変換行列
 	XMMATRIX matView;
-	XMFLOAT3 eye(0, 0, -100);
+	XMFLOAT3 eye(0, 150, -10);
 	XMFLOAT3 target(0, 0, 0);
 	XMFLOAT3 up(0, 1, -0);
 	matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
@@ -1256,11 +1355,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//}
 
 
-		//for (size_t i = 0; i < _countof(object3ds); i++) {
-		//	UpdateObject3d(&object3ds[i], matView, matProjection);
-		//}
 
-		//UpdateObject3d(&playerObj, matView, matProjection);
+		//自機
 		PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj);
 
 		//弾
@@ -1283,6 +1379,71 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		else if (playerObj.mode == 3) {
 			PlayerBulletUpdate(&playerBulletObj, matView, matProjection);
 		}
+
+		//紙
+		PaperUpdate(&paperObj, matView, matProjection);
+
+			for (size_t i = 0; i < 10; i++) {
+			//リセット
+			if (paperObj.flag == 0) {
+				if (paperObj.type[i] == 0) {
+					PaperAirplaneReset(&paperAirplaneObjs[i]);
+				}
+				else {
+					PaperCircleReset(&paperCircleObjs[i]);
+				}
+			}
+
+			//初期化
+			else if (paperObj.flag == 1) {
+				if (paperObj.type[i] == 0) {
+					PaperAirplaneInitialize(&paperAirplaneObjs[i],matView,matProjection, device);
+					paperAirplaneObjs[i].position.z = paperObj.trans[i].z;
+					paperAirplaneObjs[i].position.x = paperObj.trans[i].x;
+					paperAirplaneObjs[i].rotation.y = paperObj.rot[i].y;
+
+				}
+				else {
+					PaperCircleInitialize(&paperCircleObjs[i], matView, matProjection, device);
+					paperCircleObjs[i].position.z = paperObj.trans[i].z;;
+					paperCircleObjs[i].position.x = paperObj.trans[i].x;
+					paperCircleObjs[i].rotation.y = paperObj.rot[i].y;
+				}
+			}
+
+			//Update
+
+			else {
+				if (paperObj.type[i] == 0) {
+					PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
+					paperObj.isLanding_[i] = paperAirplaneObjs[i].isLanding;
+				}
+				else {
+					PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
+					paperObj.isLanding_[i] = paperCircleObjs[i].isLanding;
+				}
+			}
+
+			if (paperObj.isCol[i] == 1) {
+				if (paperObj.type[i] == 0) {
+					PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
+				}
+				else {
+					PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
+				}
+			}
+
+		}
+
+		//for (size_t i = 0; i < _countof(paperAirplaneObjs); i++) {
+		//	PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
+		//}
+
+		//for (size_t i = 0; i < _countof(paperCircleObjs); i++) {
+		//	PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
+		//}
+
+
 
 		//if (input->TriggerKey(DIK_SPACE)) {
 		//	if (incrementSize != 0) {
@@ -1368,9 +1529,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// インデックスバッファビューの設定コマンド
 		commandList->IASetIndexBuffer(&ibView);
 
-		for (int i = 0; i < _countof(object3ds); i++) {
-			DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
-		}
+		//for (int i = 0; i < _countof(object3ds); i++) {
+		//	DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
+		//}
 
 		////自機描画
 		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
@@ -1378,6 +1539,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices));
 		if (playerObj.mode == 3) {
 			PlayerBulletDraw(&playerBulletObj, commandList, vbView, ibView, _countof(indices));
+		}
+
+		for (int i = 0; i < 10; i++) {
+
+			if (paperObj.type[i] == 0) {
+				if (i != 0) {
+					incrementSize = 0;
+				}
+				PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices),srvGpuHandle, incrementSize);
+			}
+			else {
+				incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				PaperCircleDraw(&paperCircleObjs[i], commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
+			}
+
 		}
 
 		// ４．描画コマンドここまで
@@ -1841,3 +2017,505 @@ void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommand
 
 //衝突したら呼び出されるコールバック関数
 void PlayerBullletOnCollision(PlayerBulletObject3d* object);
+
+//------------紙----------------
+
+void PaperInitialize(PaperObject3d* object, ComPtr<ID3D12Device> device) {
+
+	HRESULT result;
+
+	// ヒープ設定
+	D3D12_HEAP_PROPERTIES cbHeapProp{};
+	cbHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;                   // GPUへの転送用
+	// リソース設定
+	D3D12_RESOURCE_DESC resdesc{};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff;   // 256バイトアラインメント
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&object->constBuffTransform));
+	assert(SUCCEEDED(result));
+
+	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
+	assert(SUCCEEDED(result));
+
+		//object->paperAirplane_[i] = new PaperAirplane;
+		//object->paperCircle_[i] = new PaperCircle;
+}
+
+void PaperUpdate(PaperObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+	object->flag++;
+
+	if (object->flag == 1) {
+		PaperSet(object);
+	}
+
+	for (int i = 0; i < 10; i++) {
+		//if (object->type[i] == 0) {
+		//	object->paperAirplane_[i]->Update();
+		//	object->isLanding_[i] = paperAirplane_[i]->GetIsLanding();
+		//}
+		//else {
+		//	object->paperCircle_[i]->Update();
+		//	object->isLanding_[i] = paperCircle_[i]->GetIsLanding();
+		//}
+
+
+
+	}
+	XMMATRIX matScale, matRot, matTrans;
+
+	//スケール,回転,平行移動行列の計算
+	matScale = XMMatrixScaling(object->scale.x, object->scale.y, object->scale.z);
+	//回転角
+	matRot = XMMatrixIdentity();
+	matRot *= XMMatrixRotationZ(object->rotation.z);
+	matRot *= XMMatrixRotationX(object->rotation.x);
+	matRot *= XMMatrixRotationY(object->rotation.y);
+	//座標
+	matTrans = XMMatrixTranslation(object->position.x, object->position.y, object->position.z);
+
+	//ワールド行列の合成
+	object->matWorld = XMMatrixIdentity();
+	object->matWorld *= matScale;
+	object->matWorld *= matRot;
+	object->matWorld *= matTrans;
+
+	////定数バッファにデータ転送
+	//object->constMapTransform->mat = object->matWorld * matView * matProjection;
+}
+
+void PaperDraw(PaperObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+
+	// 頂点バッファビューの設定コマンド
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
+
+	// 定数バッファビュー(CBV)の設定コマンド
+	commandList->SetGraphicsRootConstantBufferView(2, object->constBuffTransform->GetGPUVirtualAddress());
+
+	// 描画コマンド
+	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+
+}
+
+//配置
+void PaperSet(PaperObject3d* object) {
+
+	for (int i = 0; i < 10; i++) {
+
+		PaperSetTrans(i, object);
+		PaperSetRot(i, object);
+
+		//飛行機か丸型かランダム
+		//乱数シード生成器
+		std::random_device seed_gen;
+		//メルセンヌ・ツイスター
+		std::mt19937_64 engine(seed_gen());
+		//乱数範囲
+		std::uniform_real_distribution<float> typeDist(0, 1.2);
+
+		float num = typeDist(engine);
+
+		if (num < 1.0f) {
+			object->type[i] = 0;
+		}
+		else {
+			object->type[i] = 1;
+		}
+
+		//if (object->type[i] == 0) {
+		//	object->paperAirplane_[i] = PaperAirplaneInitialize(planeModel_, planeTextureHandle_, trans[i], rot[i]);
+		//}
+		//else {
+		//	object->paperCircle_[i] = PaperCircleInitialize(planeModel_, planeTextureHandle_, trans[i], rot[i]);
+		//}
+	}
+
+}
+
+//座標配置
+void PaperSetTrans(int i, PaperObject3d* object) {
+	//乱数シード生成器
+	std::random_device seed_gen;
+	//メルセンヌ・ツイスター
+	std::mt19937_64 engine(seed_gen());
+	//乱数範囲(座標用)
+	std::uniform_real_distribution<float> transDist(0.0f, object->space);
+
+
+	//乱数を配置する間隔の最大値と最小値で乱数を取る(*100と/100はint→float)
+	object->trans[i].x = transDist(engine);
+
+	if (i == 0) {
+		object->trans[0].x = object->maxLeft;
+	}
+
+	//前の座標を足して座標を移動
+	object->trans[i].x += object->beforeTrans;
+	//今の座標を記録 + sizeでかぶりをなくす
+	object->beforeTrans = (object->trans[i].x + object->size);
+
+	object->trans[i].y = object->transY;
+	object->trans[i].z = object->transZ;
+}
+
+//角度配置
+void PaperSetRot(int i, PaperObject3d* object) {
+	//乱数シード生成器
+	std::random_device seed_gen;
+	//メルセンヌ・ツイスター
+	std::mt19937_64 engine(seed_gen());
+	//乱数範囲(回転角用)
+	std::uniform_real_distribution<float> rotDist(0.0f, 2 * PI);
+
+
+	//乱数を配置する間隔の最大値と最小値で乱数を取る(*100と/100はint→float)
+	object->rot[i].y = rotDist(engine);
+
+	object->rot->x = object->rotX;
+	object->rot->z = object->rotZ;
+
+}
+
+void PaperSetIsCol(int i, PaperObject3d* object) {
+	object->isCol[i] = 2;
+}
+
+void PaperOnCollision(int i, float windPower, Vector3 fanTrans, PaperObject3d* object) {
+
+	//if (object->type[i] == 0) {
+	//	object->paperAirplane_[i] = PaperAirplaneOnCollision(windPower, fanTrans);
+	//}
+	//else {
+	//	object->paperCircle_[i] = PaperCircleOnCollision(windPower, fanTrans);
+	//}
+
+	object->isCol[i] = 1;
+}
+
+void PaperReset(PaperObject3d* object) {
+	object->flag = 0;
+	object->beforeTrans = 0;
+
+}
+
+//------------紙飛行機-----------------
+
+void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device) {
+
+	HRESULT result;
+
+	// ヒープ設定
+	D3D12_HEAP_PROPERTIES cbHeapProp{};
+	cbHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;                   // GPUへの転送用
+	// リソース設定
+	D3D12_RESOURCE_DESC resdesc{};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff;   // 256バイトアラインメント
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&object->constBuffTransform));
+	assert(SUCCEEDED(result));
+
+	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
+	assert(SUCCEEDED(result));
+
+}
+
+
+void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+	XMMATRIX matScale, matRot, matTrans;
+
+	//スケール,回転,平行移動行列の計算
+	matScale = XMMatrixScaling(object->scale.x, object->scale.y, object->scale.z);
+	//回転角
+	matRot = XMMatrixIdentity();
+	matRot *= XMMatrixRotationZ(object->rotation.z);
+	matRot *= XMMatrixRotationX(object->rotation.x);
+	matRot *= XMMatrixRotationY(object->rotation.y);
+	//座標
+	matTrans = XMMatrixTranslation(object->position.x, object->position.y, object->position.z);
+
+	//ワールド行列の合成
+	object->matWorld = XMMatrixIdentity();
+	object->matWorld *= matScale;
+	object->matWorld *= matRot;
+	object->matWorld *= matTrans;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+}
+
+
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += incrementSize;
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+
+	// 頂点バッファビューの設定コマンド
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
+
+	// 定数バッファビュー(CBV)の設定コマンド
+	commandList->SetGraphicsRootConstantBufferView(2, object->constBuffTransform->GetGPUVirtualAddress());
+
+	// 描画コマンド
+	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+
+}
+
+//衝突したら呼び出されるコールバック関数
+void PaperAirplaneOnCollision(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object) {
+	object->move = 1;
+	PaperAirplaneSet(windPower, fanTrans, object);
+}
+
+//速度計さん
+void PaperAirplaneCalculationSpeed(PaperAirplaneObject3d* object) {
+	//速度を計算
+	object->velocity_ = { 0,(-object->fallSpeed),object->speed };
+
+	//減速
+	if (object->speed >= 0.1) {
+		object->speed -= object->decelerationRate;
+	}
+}
+
+void PaperAirplaneMove(PaperAirplaneObject3d* object) {
+	//行列更新
+	object->position.x += object->velocity_.x;
+	object->position.y += object->velocity_.y;
+	object->position.z += object->velocity_.z;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld;
+
+}
+
+//速度などをセット
+void PaperAirplaneSet(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object) {
+	//速度,落下スピード,減速をセット
+
+//風速をそのままスピードに代入
+	object->speed = (windPower / 10) + 0.01;//0.1～1.1の範囲
+
+	//紙飛行機と扇風機の座標の差が落下スピード
+	//if文でマイナスにならないようにする
+	if ((fanTrans.x - object->position.x) > 0) {
+		object->fallSpeed = (fanTrans.x - object->position.x) / 10;
+	}
+	else {
+		object->fallSpeed = (object->position.x - fanTrans.x) / 10;
+	}
+
+	if (object->fallSpeed <= 0.02) {
+		object->fallSpeed = 0.02;
+	}
+
+	//減速率を計算,角度が0(まっすぐ)に近いほど減速率は少ない
+	if (object->position.y < PI) {
+		object->decelerationRate = (object->position.y);
+	}
+	else {
+		object->decelerationRate = (object->position.y - PI);
+
+		if (object->decelerationRate < (PI / 2)) {
+			object->decelerationRate = (PI - object->decelerationRate);
+		}
+		else {
+			object->decelerationRate = (PI - object->decelerationRate);
+			//decelerationRate_ += (decelerationRate_ + decelerationRate_);
+		}
+
+	}
+
+	object->decelerationRate = object->decelerationRate / 100;
+}
+
+//着地してるかしてないか
+void PaperAirplaneLandingJudge(PaperAirplaneObject3d* object) {
+	if (object->position.y <= object->endY) {
+		object->isLanding = 1;
+		object->move = 0;
+	}
+}
+
+void PaperAirplaneReset(PaperAirplaneObject3d* object) {
+	//0 停止 1 移動
+	object->move = 0;
+	object->isLanding = 0;
+}
+
+//------------丸紙-----------------
+
+void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection,ComPtr<ID3D12Device> device) {
+
+	HRESULT result;
+
+	// ヒープ設定
+	D3D12_HEAP_PROPERTIES cbHeapProp{};
+	cbHeapProp.Type = D3D12_HEAP_TYPE_UPLOAD;                   // GPUへの転送用
+	// リソース設定
+	D3D12_RESOURCE_DESC resdesc{};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = (sizeof(ConstBufferDataTransform) + 0xff) & ~0xff;   // 256バイトアラインメント
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 定数バッファの生成
+	result = device->CreateCommittedResource(
+		&cbHeapProp, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resdesc, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&object->constBuffTransform));
+	assert(SUCCEEDED(result));
+
+	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
+	assert(SUCCEEDED(result));
+}
+
+
+void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+	XMMATRIX matScale, matRot, matTrans;
+
+	//スケール,回転,平行移動行列の計算
+	matScale = XMMatrixScaling(object->scale.x, object->scale.y, object->scale.z);
+	//回転角
+	matRot = XMMatrixIdentity();
+	matRot *= XMMatrixRotationZ(object->rotation.z);
+	matRot *= XMMatrixRotationX(object->rotation.x);
+	matRot *= XMMatrixRotationY(object->rotation.y);
+	//座標
+	matTrans = XMMatrixTranslation(object->position.x, object->position.y, object->position.z);
+
+	//ワールド行列の合成
+	object->matWorld = XMMatrixIdentity();
+	object->matWorld *= matScale;
+	object->matWorld *= matRot;
+	object->matWorld *= matTrans;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+}
+
+
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += incrementSize;
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+
+	// 頂点バッファビューの設定コマンド
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
+
+	// 定数バッファビュー(CBV)の設定コマンド
+	commandList->SetGraphicsRootConstantBufferView(2, object->constBuffTransform->GetGPUVirtualAddress());
+
+	// 描画コマンド
+	commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+
+}
+
+//衝突したら呼び出されるコールバック関数
+void PaperCircleOnCollision(float windPower, Vector3 fanTrans, PaperCircleObject3d* object) {
+	object->move = 1;
+	PaperCircleSet(windPower, fanTrans, object);
+}
+
+//速度計さん
+void PaperCircleCalculationSpeed(PaperCircleObject3d* object) {
+	//速度を計算
+	object->velocity_ = { 0,(-object->fallSpeed),object->speed };
+
+	//減速
+	if (object->speed >= 0.1) {
+		object->speed -= object->decelerationRate;
+	}
+}
+
+void PaperCircleMove(PaperCircleObject3d* object) {
+
+	//行列更新
+	object->position.x += object->velocity_.x;
+	object->position.y += object->velocity_.y;
+	object->position.z += object->velocity_.z;
+
+	//定数バッファにデータ転送
+	object->constMapTransform->mat = object->matWorld;
+
+}
+
+//速度などをセット
+void PaperCircleSet(float windPower, Vector3 fanTrans, PaperCircleObject3d* object) {
+	//速度,落下スピード,減速をセット
+
+	//風速をそのままスピードに代入
+	object->speed = (windPower / 10) + 0.01;//0.1～1.1の範囲
+
+	//紙飛行機と扇風機の座標の差が落下スピード
+	//if文でマイナスにならないようにする
+	if ((fanTrans.x - object->position.x) > 0) {
+		object->fallSpeed = (fanTrans.x - object->position.x) / 10;
+	}
+	else {
+		object->fallSpeed = (object->position.x - fanTrans.x) / 10;
+	}
+
+	if (object->fallSpeed <= 0.02) {
+		object->fallSpeed = 0.02;
+	}
+
+	//減速率を計算,角度が0(まっすぐ)に近いほど減速率は少ない
+
+
+	object->decelerationRate = 0.01;
+}
+
+//着地してるかしてないか
+void PaperCircleLandingJudge(PaperCircleObject3d* object) {
+	if (object->position.y <= object->endY) {
+		object->isLanding = 1;
+		object->move = 0;
+	}
+}
+
+void PaperCircleReset(PaperCircleObject3d* object) {
+	//0 停止 1 移動
+	object->move = 0;
+	object->isLanding = 0;
+}
