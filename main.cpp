@@ -306,7 +306,7 @@ void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommand
 bool PlayerBulletIsDead(PlayerBulletObject3d* object) { return  object->isDead_; }
 
 //衝突したら呼び出されるコールバック関数
-void PlayerBullletOnCollision(PlayerBulletObject3d* object);
+void PlayerBulletOnCollision(PlayerBulletObject3d* object);
 
 //------------紙----------------
 
@@ -327,17 +327,17 @@ void PaperSetRot(int i, PaperObject3d* object);
 
 void PaperSetIsCol(int i, PaperObject3d* object);
 
-void PaperOnCollision(int i, float windPower, Vector3 fanTrans, PaperObject3d* object);
+void PaperOnCollision(int i, PaperObject3d* object);
 
 void PaperReset(PaperObject3d* object);
 
 //------------紙飛行機-----------------
 
-void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection,ComPtr<ID3D12Device> device);
+void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device);
 
 void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
 
 //衝突したら呼び出されるコールバック関数
 void PaperAirplaneOnCollision(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object);
@@ -360,7 +360,7 @@ void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMAT
 
 void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
 
 //衝突したら呼び出されるコールバック関数
 void PaperCircleOnCollision(float windPower, Vector3 fanTrans, PaperCircleObject3d* object);
@@ -949,7 +949,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	////配列内の全オブジェクトに対して
 	//for (int i = 0; i < _countof(paperObjs); i++) {
 	//	//初期化
-		PaperInitialize(&paperObj, device);
+	PaperInitialize(&paperObj, device);
 	//}
 	//---------紙飛行機初期化---------
 
@@ -973,6 +973,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//	PaperCircleInitialize(paperCircleObjs, device);
 	//}
 
+	//gamescene初期化
+	//GameScene gamescene;
+
+	//gamescene(ゲームシーン管理系,カメラ関係,当たり判定)
+
+
+	//カメラモード
+	int cameramode = 0;//0 上から //1横から
+
+	//何番の紙飛行機が当たったか
+	int touchPaperNum = 0;
+
+	//0　タイトル　1射撃準備 2紙飛行機飛び 3リザルト
+	int scene = 0;
+
+	//何回打ったか
+	int shot = 0;
+	//地面についてるか
+	int isLand = 0;
+
+	//何番をもう打ったか
+	int beginshot[3] = {};
+
+	float highScore = 0;
 
 	//座標変換
 
@@ -1340,110 +1364,328 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
 		}
 
-		//ワールド変換
+		//---------------カメラ-------------
 
-		//平行移動更新
-
-		//if (input->PushKey(DIK_UP) || input->PushKey(DIK_DOWN) || input->PushKey(DIK_RIGHT) || input->PushKey(DIK_LEFT)) {
-
-		//	//座標を移動する処理(Z座標)
-		//	if (input->PushKey(DIK_UP)) { object3ds[0].position.y += 1.0f; }
-		//	else if (input->PushKey(DIK_DOWN)) { object3ds[0].position.y -= 1.0f; }
-		//	if (input->PushKey(DIK_RIGHT)) { object3ds[0].position.x += 1.0f; }
-		//	else if (input->PushKey(DIK_LEFT)) { object3ds[0].position.x -= 1.0f; }
-
-		//}
-
-
-
-		//自機
-		PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj);
-
-		//弾
-
-		if (playerObj.mode == 0) {
-
-			//弾の速度
-			const float kBulletSpeed = 1.0f;
-			Vector3 velocity(0, 0, kBulletSpeed);
-
-			//速度ベクトルを自機の向きに合わせて回転させる
-			velocity = transform(velocity, rotateX(playerBulletObj.rotation.x));
-
-			Vector3 pos(playerObj.position.x, playerObj.position.y, playerObj.position.z);
-
-			//弾を生成し初期化
-			PlayerBulletInitialize(&playerBulletObj, device, pos, velocity);
+		if (scene == 0) {
 
 		}
-		else if (playerObj.mode == 3) {
-			PlayerBulletUpdate(&playerBulletObj, matView, matProjection);
-		}
+		else if (scene == 1) {
 
-		//紙
-		PaperUpdate(&paperObj, matView, matProjection);
+			cameramode = 0;
+
+			//自機
+			PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj);
+
+			//弾
+
+			if (playerObj.mode == 0) {
+
+				//弾の速度
+				const float kBulletSpeed = 1.0f;
+				Vector3 velocity(0, 0, kBulletSpeed);
+
+				//速度ベクトルを自機の向きに合わせて回転させる
+				velocity = transform(velocity, rotateX(playerBulletObj.rotation.x));
+
+				Vector3 pos(playerObj.position.x, playerObj.position.y, playerObj.position.z);
+
+				//弾を生成し初期化
+				PlayerBulletInitialize(&playerBulletObj, device, pos, velocity);
+
+			}
+			else if (playerObj.mode == 3) {
+
+				if (playerBulletObj.isDead_ == false) {
+					PlayerBulletUpdate(&playerBulletObj, matView, matProjection);
+				}
+				else {
+
+				}
+			}
+
+			if (shot >= 1) {
+
+			}
+
+			//紙
+			PaperUpdate(&paperObj, matView, matProjection);
 
 			for (size_t i = 0; i < 10; i++) {
-			//リセット
-			if (paperObj.flag == 0) {
-				if (paperObj.type[i] == 0) {
-					PaperAirplaneReset(&paperAirplaneObjs[i]);
+				//リセット
+				if (paperObj.flag == 0) {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneReset(&paperAirplaneObjs[i]);
+					}
+					else {
+						PaperCircleReset(&paperCircleObjs[i]);
+					}
 				}
+
+				//初期化
+				else if (paperObj.flag == 1) {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneInitialize(&paperAirplaneObjs[i], matView, matProjection, device);
+						paperAirplaneObjs[i].position.z = paperObj.trans[i].z;
+						paperAirplaneObjs[i].position.x = paperObj.trans[i].x;
+						paperAirplaneObjs[i].rotation.y = paperObj.rot[i].y;
+
+					}
+					else {
+						PaperCircleInitialize(&paperCircleObjs[i], matView, matProjection, device);
+						paperCircleObjs[i].position.z = paperObj.trans[i].z;;
+						paperCircleObjs[i].position.x = paperObj.trans[i].x;
+						paperCircleObjs[i].rotation.y = paperObj.rot[i].y;
+					}
+				}
+
+				//Update
+
 				else {
-					PaperCircleReset(&paperCircleObjs[i]);
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
+						paperObj.isLanding_[i] = paperAirplaneObjs[i].isLanding;
+					}
+					else {
+						PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
+						paperObj.isLanding_[i] = paperCircleObjs[i].isLanding;
+					}
 				}
-			}
 
-			//初期化
-			else if (paperObj.flag == 1) {
-				if (paperObj.type[i] == 0) {
-					PaperAirplaneInitialize(&paperAirplaneObjs[i],matView,matProjection, device);
-					paperAirplaneObjs[i].position.z = paperObj.trans[i].z;
-					paperAirplaneObjs[i].position.x = paperObj.trans[i].x;
-					paperAirplaneObjs[i].rotation.y = paperObj.rot[i].y;
+				if (paperObj.isCol[i] == 1) {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
+					}
+					else {
+						PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
+					}
+				}
 
-				}
-				else {
-					PaperCircleInitialize(&paperCircleObjs[i], matView, matProjection, device);
-					paperCircleObjs[i].position.z = paperObj.trans[i].z;;
-					paperCircleObjs[i].position.x = paperObj.trans[i].x;
-					paperCircleObjs[i].rotation.y = paperObj.rot[i].y;
-				}
-			}
-
-			//Update
-
-			else {
-				if (paperObj.type[i] == 0) {
-					PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
-					paperObj.isLanding_[i] = paperAirplaneObjs[i].isLanding;
-				}
-				else {
-					PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
-					paperObj.isLanding_[i] = paperCircleObjs[i].isLanding;
-				}
-			}
-
-			if (paperObj.isCol[i] == 1) {
-				if (paperObj.type[i] == 0) {
-					PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
-				}
-				else {
-					PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
-				}
 			}
 
 		}
+		else if (scene == 2) {
 
-		//for (size_t i = 0; i < _countof(paperAirplaneObjs); i++) {
-		//	PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
+			//紙
+			PaperUpdate(&paperObj, matView, matProjection);
+
+			for (size_t i = 0; i < 10; i++) {
+				//リセット
+				if (paperObj.flag == 0) {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneReset(&paperAirplaneObjs[i]);
+					}
+					else {
+						PaperCircleReset(&paperCircleObjs[i]);
+					}
+				}
+
+				//Update
+
+				else {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneUpdate(&paperAirplaneObjs[i], matView, matProjection);
+						paperObj.isLanding_[i] = paperAirplaneObjs[i].isLanding;
+					}
+					else {
+						PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
+						paperObj.isLanding_[i] = paperCircleObjs[i].isLanding;
+					}
+				}
+
+				if (paperObj.isCol[i] == 1) {
+					if (paperObj.type[i] == 0) {
+						PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
+					}
+					else {
+						PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
+					}
+				}
+
+			}
+
+			if (input->PushKey(DIK_1)) {
+				cameramode = 1;
+			}
+			else if (input->PushKey(DIK_2)) {
+				cameramode = 2;
+			}
+
+			//地面についたらshotを増やす,以前に落ちた弾は除外
+
+
+			if (paperObj.type[touchPaperNum] == 0) {
+				if (paperAirplaneObjs[touchPaperNum].isLanding == 1) {
+					if (isLand == 0) {
+						isLand = 1;
+						beginshot[shot] = touchPaperNum;
+						shot++;
+						PaperSetIsCol(touchPaperNum, &paperObj);
+					}
+				}
+			}
+			else {
+				if (paperCircleObjs[touchPaperNum].isLanding == 1) {
+					if (isLand == 0) {
+						isLand = 1;
+						beginshot[shot] = touchPaperNum;
+						shot++;
+						PaperSetIsCol(touchPaperNum, &paperObj);
+					}
+				}
+			}
+
+
+
+
+
+
+			////弾を外した場合
+			//const std::list<std::unique_ptr<FanWind>>& fanWinds = fan_->GetBullets();
+
+			//for (const std::unique_ptr<FanWind>& fanwind : fanWinds) {
+			//	if (fanwind->GetWorldPosition().z >= 100) {
+			//		shot++;
+			//	}
+			//}
+
+		}
+		else if (scene == 3) {
+
+		}
+
+		//カメラ
+
+		//if (input_->PushKey(DIK_0)) {
+		//	cameramode = 0;
+		//}
+		//else if (input_->PushKey(DIK_1)) {
+		//	cameramode = 1;
+		//}
+		//else if (input_->PushKey(DIK_2)) {
+		//	cameramode = 2;
 		//}
 
-		//for (size_t i = 0; i < _countof(paperCircleObjs); i++) {
-		//	PaperCircleUpdate(&paperCircleObjs[i], matView, matProjection);
-		//}
+		if (cameramode == 0) {
+			//視点座標
+			eye = { 0,30,-30 };
+			target = { 0, 0,0 };
 
 
+			//viewProjection_.eye.z = paper_->GetWorldPosition(touchPaperNum).z + (-30);
+			//viewProjection_.target.z = paper_->GetWorldPosition(touchPaperNum).z;
+			matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+
+		}
+		else if (cameramode == 1) {
+			//視点座標
+			eye = { 50,0,3 };
+			//viewProjection_.target = { 30, 0,0 };
+
+			if (paperObj.type[touchPaperNum] == 0) {
+				eye.z = paperAirplaneObjs[touchPaperNum].position.z;
+				target.z = paperAirplaneObjs[touchPaperNum].position.z;
+			}
+			else {
+				eye.z = paperCircleObjs[touchPaperNum].position.z;
+				target.z = paperCircleObjs[touchPaperNum].position.z;
+			}
+
+			matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+
+		}
+		else if (cameramode == 2) {
+			//視点座標
+			eye = { 500,0,3 };
+			target = { 30, 0,0 };
+
+			if (paperObj.type[touchPaperNum] == 0) {
+				eye.z = paperAirplaneObjs[touchPaperNum].position.z;
+				target.z = paperAirplaneObjs[touchPaperNum].position.z;
+			}
+			else {
+				eye.z = paperCircleObjs[touchPaperNum].position.z;
+				target.z = paperCircleObjs[touchPaperNum].position.z;
+			}
+
+			matView = XMMatrixLookAtLH(XMLoadFloat3(&eye), XMLoadFloat3(&target), XMLoadFloat3(&up));
+
+		}
+
+		//debugText_->SetPos(0, 80);
+		//debugText_->Printf("PaperTrans[%d] = (%f,%f,%f)", touchPaperNum, paper_->GetWorldPosition(touchPaperNum).x, paper_->GetWorldPosition(touchPaperNum).y, paper_->GetWorldPosition(touchPaperNum).z);
+
+		//debugText_->SetPos(0, 140);
+		//debugText_->Printf("scene = %d", scene);
+		//debugText_->SetPos(0, 160);
+		//debugText_->Printf("shot = %d", shot);
+		//debugText_->SetPos(0, 180);
+		//debugText_->Printf("isLand = %d", isLand);
+
+		//シーン切り替え
+
+		if (scene == 0) {
+			if (input->TriggerKey(DIK_SPACE)) {
+				scene = 1;
+			}
+		}
+		else if (scene == 1 && paperObj.isCol[touchPaperNum] == 1) {
+			scene = 2;
+			cameramode = 2;
+		}
+		else if (scene == 2 && shot < 3 && isLand == 1) {
+
+			scene = 1;
+			PlayerReset(&playerObj);
+			isLand = 0;
+		}
+		else if (scene == 2 && shot >= 3 && isLand == 1) {
+
+			scene = 3;
+			isLand = 0;
+
+		}
+		else if (scene == 3) {
+			if (input->TriggerKey(DIK_SPACE)) {
+				scene = 0;
+				shot = 0;
+				PaperReset(&paperObj);
+				for (int i = 0; i < 10; i++) {
+					PaperAirplaneReset(&paperAirplaneObjs[i]);
+					PaperCircleReset(&paperCircleObjs[i]);
+				}
+
+				PlayerReset(&playerObj);
+
+			}
+
+			if (paperObj.type[beginshot[0]] == 0) {
+
+				if (paperAirplaneObjs[beginshot[0]].position.z > paperAirplaneObjs[beginshot[1]].position.z) {
+					highScore = paperAirplaneObjs[beginshot[0]].position.z;
+				}
+				else {
+					paperAirplaneObjs[beginshot[1]].position.z;
+				}
+
+				if (paperAirplaneObjs[beginshot[2]].position.z > highScore) {
+					highScore = paperAirplaneObjs[beginshot[2]].position.z;
+				}
+			}
+			else {
+				if (paperCircleObjs[beginshot[0]].position.z > paperCircleObjs[beginshot[1]].position.z) {
+					highScore = paperCircleObjs[beginshot[0]].position.z;
+				}
+				else {
+					paperCircleObjs[beginshot[1]].position.z;
+				}
+
+				if (paperCircleObjs[beginshot[2]].position.z > highScore) {
+					highScore = paperCircleObjs[beginshot[2]].position.z;
+				}
+			}
+
+
+		}
 
 		//if (input->TriggerKey(DIK_SPACE)) {
 		//	if (incrementSize != 0) {
@@ -1454,6 +1696,55 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//	}
 		//}
 
+		//------------当たり判定---------------
+			//判定対象AとBの座標
+		Vector3 posA, posB;
+
+		////自弾リストの取得
+		//const std::list<std::unique_ptr<FanWind>>& fanWinds = fan_->GetBullets();
+
+#pragma region 自弾と敵弾の当たり判定
+
+			//自弾と敵弾の当たり判定
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 10; j++) {
+
+				//自弾の座標
+				posA = Vector3(playerBulletObj.position.x, playerBulletObj.position.y, playerBulletObj.position.z);
+				//敵弾の座標
+				if (paperObj.type[j] == 0) {
+					posB = Vector3(paperAirplaneObjs[j].position.x, paperAirplaneObjs[j].position.y, paperAirplaneObjs[j].position.z);
+				}
+				else {
+					posB = Vector3(paperCircleObjs[j].position.x, paperCircleObjs[j].position.y, paperCircleObjs[j].position.z);
+				}
+
+				//半径
+				float posAR = 5;
+				float posBR = 5;
+
+				if (((posA.x - posB.x) * (posA.x - posB.x)) + ((posA.y - posB.y) * (posA.y - posB.y)) + ((posA.z - posB.z) * (posA.z - posB.z)) <= ((posAR + posBR) * (posAR + posBR))) {
+
+
+					PaperOnCollision(j, &paperObj);
+					//自弾の衝突時コールバックを呼び出す
+					playerBulletObj.isDead_ = true;
+					//敵弾の衝突時コールバックを呼び出す
+					if (paperObj.type[j] == 0) {
+						PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[j]);
+					}
+					else {
+						PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[j]);
+					}
+
+					touchPaperNum = j;
+
+					//debugText_->SetPos(0, 40);
+					//debugText_->Printf("atatta");
+				}
+			}
+		}
+#pragma endregion
 
 		//更新処理-ここまで
 
@@ -1520,14 +1811,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// SRVヒープの先頭ハンドルを取得（SRVを指しているはず）
 		D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle = srvHeap->GetGPUDescriptorHandleForHeapStart();
+		
 		// SRVヒープの先頭にあるSRVをルートパラメータ1番に設定
-		//commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
-
 		srvGpuHandle.ptr += incrementSize;
 		commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
-		// インデックスバッファビューの設定コマンド
-		commandList->IASetIndexBuffer(&ibView);
 
 		//for (int i = 0; i < _countof(object3ds); i++) {
 		//	DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
@@ -1536,24 +1824,37 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		////自機描画
 		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
 
-		PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices));
-		if (playerObj.mode == 3) {
-			PlayerBulletDraw(&playerBulletObj, commandList, vbView, ibView, _countof(indices));
-		}
+		if (scene == 1 || scene == 2 || scene == 3) {
 
-		for (int i = 0; i < 10; i++) {
+			incrementSize = 0;
+			srvGpuHandle.ptr = incrementSize;
 
-			if (paperObj.type[i] == 0) {
-				if (i != 0) {
-					incrementSize = 0;
+			PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices));
+			if (playerObj.mode == 3) {
+				if (playerBulletObj.isDead_ == false) {
+					PlayerBulletDraw(&playerBulletObj, commandList, vbView, ibView, _countof(indices));
 				}
-				PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices),srvGpuHandle, incrementSize);
-			}
-			else {
-				incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-				PaperCircleDraw(&paperCircleObjs[i], commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 			}
 
+			if (paperObj.flag >= 3) {
+
+				for (int i = 0; i < 10; i++) {
+
+					if (paperObj.type[i] == 0) {
+						incrementSize = 0;
+						srvGpuHandle.ptr = incrementSize;
+			
+						PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices));
+					}
+					else {
+						incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+						srvGpuHandle.ptr = incrementSize;
+				
+						PaperCircleDraw(&paperCircleObjs[i], commandList, vbView, ibView, _countof(indices));
+					}
+
+				}
+			}
 		}
 
 		// ４．描画コマンドここまで
@@ -1974,7 +2275,9 @@ void PlayerBulletUpdate(PlayerBulletObject3d* object, XMMATRIX& matView, XMMATRI
 	//定数バッファにデータ転送
 	object->constMapTransform->mat = object->matWorld * matView * matProjection;
 
-	if (-(object->deathTimer_) <= 0) {
+	object->deathTimer_--;
+
+	if ((object->deathTimer_) <= 0) {
 		object->isDead_ = true;
 	}
 
@@ -2050,8 +2353,8 @@ void PaperInitialize(PaperObject3d* object, ComPtr<ID3D12Device> device) {
 	result = object->constBuffTransform->Map(0, nullptr, (void**)&object->constMapTransform); // マッピング
 	assert(SUCCEEDED(result));
 
-		//object->paperAirplane_[i] = new PaperAirplane;
-		//object->paperCircle_[i] = new PaperCircle;
+	//object->paperAirplane_[i] = new PaperAirplane;
+	//object->paperCircle_[i] = new PaperCircle;
 }
 
 void PaperUpdate(PaperObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
@@ -2196,14 +2499,7 @@ void PaperSetIsCol(int i, PaperObject3d* object) {
 	object->isCol[i] = 2;
 }
 
-void PaperOnCollision(int i, float windPower, Vector3 fanTrans, PaperObject3d* object) {
-
-	//if (object->type[i] == 0) {
-	//	object->paperAirplane_[i] = PaperAirplaneOnCollision(windPower, fanTrans);
-	//}
-	//else {
-	//	object->paperCircle_[i] = PaperCircleOnCollision(windPower, fanTrans);
-	//}
+void PaperOnCollision(int i, PaperObject3d* object) {
 
 	object->isCol[i] = 1;
 }
@@ -2250,6 +2546,16 @@ void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, X
 
 
 void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+	PaperAirplaneCalculationSpeed(object);
+
+	if (object->move == 1) {
+		PaperAirplaneMove(object);
+	}
+
+	//落下判定
+	PaperAirplaneLandingJudge(object);
+
 	XMMATRIX matScale, matRot, matTrans;
 
 	//スケール,回転,平行移動行列の計算
@@ -2273,10 +2579,10 @@ void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMAT
 }
 
 
-void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
 
-	srvGpuHandle.ptr += incrementSize;
-	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
 
 	// 頂点バッファビューの設定コマンド
 	commandList->IASetVertexBuffers(0, 1, &vbView);
@@ -2376,7 +2682,7 @@ void PaperAirplaneReset(PaperAirplaneObject3d* object) {
 
 //------------丸紙-----------------
 
-void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection,ComPtr<ID3D12Device> device) {
+void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device) {
 
 	HRESULT result;
 
@@ -2409,6 +2715,16 @@ void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMAT
 
 
 void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection) {
+
+	PaperCircleCalculationSpeed(object);
+
+	if (object->move == 1) {
+		PaperCircleMove(object);
+	}
+
+	//落下判定
+	PaperCircleLandingJudge(object);
+
 	XMMATRIX matScale, matRot, matTrans;
 
 	//スケール,回転,平行移動行列の計算
@@ -2429,13 +2745,14 @@ void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX&
 
 	//定数バッファにデータ転送
 	object->constMapTransform->mat = object->matWorld * matView * matProjection;
+
 }
 
 
-void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
 
-	srvGpuHandle.ptr += incrementSize;
-	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+	// インデックスバッファビューの設定コマンド
+	commandList->IASetIndexBuffer(&ibView);
 
 	// 頂点バッファビューの設定コマンド
 	commandList->IASetVertexBuffers(0, 1, &vbView);
