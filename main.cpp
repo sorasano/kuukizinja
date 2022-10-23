@@ -91,11 +91,11 @@ struct PlayerObject3d {
 	int mode = 1;
 
 	//キャラクターの移動速さ
-	const float speed = 0.6f;
+	const float speed = 0.2f;
 
 	//移動限界距離
-	int moveLimitLeft = -110;
-	int moveLimitRight = 110;
+	int moveLimitLeft = -30;
+	int moveLimitRight = 30;
 
 	//風量
 	float windPower = 0;
@@ -106,7 +106,7 @@ struct PlayerObject3d {
 
 	int push = 0;
 
-	int keyCoolTime = 10;
+	int keyCoolTime = 100;
 
 	////弾
 	//std::list<std::unique_ptr<PlayerBulletObject3d>> bullets_;
@@ -168,17 +168,17 @@ struct PaperObject3d {
 
 	//変わらない値(統一)
 	float transY = 0;
-	float transZ = 30;
+	float transZ = 5;
 
 	float rotX = 0;
 	float rotZ = 0;
 
 	//配置する位置の端
-	float maxLeft = -95.0f;
-	float maxRight = 95.0f;
+	float maxLeft = -30.0f;
+	float maxRight = 20.0f;
 
 	//配置する最大間隔
-	float space = 3.0f;
+	float space = 4.0f;
 
 	//回転差
 	float rotdiff = 6;
@@ -187,7 +187,7 @@ struct PaperObject3d {
 	float beforeTrans = 0;
 
 	//サイズ
-	int size = 20.0f;
+	int size = 4.5f;
 
 };
 
@@ -270,7 +270,7 @@ void PlayerInitialize(PlayerObject3d* object, ComPtr<ID3D12Device> device);
 void PlayerUpdate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection, ComPtr<ID3D12Device> device, PlayerBulletObject3d playerBulletObj);
 
 //描画
-void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
 //旋回
 void PlayerRotate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
@@ -337,7 +337,7 @@ void PaperAirplaneInitialize(PaperAirplaneObject3d* object, XMMATRIX& matView, X
 
 void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
 //衝突したら呼び出されるコールバック関数
 void PaperAirplaneOnCollision(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* object);
@@ -360,7 +360,7 @@ void PaperCircleInitialize(PaperCircleObject3d* object, XMMATRIX& matView, XMMAT
 
 void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
 //衝突したら呼び出されるコールバック関数
 void PaperCircleOnCollision(float windPower, Vector3 fanTrans, PaperCircleObject3d* object);
@@ -628,40 +628,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	Vertex vertices[] = {
 		// x      y     z     法線  u     v
 		//前
-		{{-5.0f,-5.0f, -5.0f}, {}, {0.0f, 1.0f}}, // 左下
-		{{-5.0f, 5.0f, -5.0f},{}, {0.0f, 0.0f}}, // 左上
-		{{5.0f, -5.0f, -5.0f}, {},{1.0f, 1.0f}}, // 右下
-		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 0.0f}}, // 右上
+		{{-1.0f,-1.0f, -1.0f}, {}, {0.0f, 1.0f}}, // 左下
+		{{-1.0f, 1.0f, -1.0f},{}, {0.0f, 0.0f}}, // 左上
+		{{1.0f, -1.0f, -1.0f}, {},{1.0f, 1.0f}}, // 右下
+		{{1.0f, 1.0f, -1.0f},{}, {1.0f, 0.0f}}, // 右上
 
 		//後
-		{{-5.0f, 5.0f, 5.0f},{}, {0.0f, 0.0f}}, // 左上
-		{{-5.0f,-5.0f, 5.0f}, {},{0.0f, 1.0f}}, // 左下
-		{{5.0f, 5.0f,  5.0f}, {},{1.0f, 0.0f}}, // 右上
-		{{5.0f, -5.0f, 5.0f}, {},{1.0f, 1.0f}}, // 右下
+		{{-1.0f, 1.0f, 1.0f},{}, {0.0f, 0.0f}}, // 左上
+		{{-1.0f,-1.0f, 1.0f}, {},{0.0f, 1.0f}}, // 左下
+		{{1.0f, 1.0f,  1.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{1.0f, -1.0f, 1.0f}, {},{1.0f, 1.0f}}, // 右下
 
 		//左
-		{{-5.0f,-5.0f, -5.0f},{}, {0.0f, 1.0f}}, // 左下
-		{{-5.0f, -5.0f, 5.0f}, {},{0.0f, 0.0f}}, // 左上
-		{{-5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
-		{{-5.0f, 5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{-1.0f,-1.0f, -1.0f},{}, {0.0f, 1.0f}}, // 左下
+		{{-1.0f, -1.0f, 1.0f}, {},{0.0f, 0.0f}}, // 左上
+		{{-1.0f, 1.0f, -1.0f},{}, {1.0f, 1.0f}}, // 右下
+		{{-1.0f, 1.0f, 1.0f}, {},{1.0f, 0.0f}}, // 右上
 
 		//右
-		{{5.0f, -5.0f, 5.0f}, {},{0.0f, 0.0f}}, // 左上
-		{{5.0f,-5.0f, -5.0f}, {},{0.0f, 1.0f}}, // 左下
-		{{5.0f, 5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
-		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
+		{{1.0f, -1.0f, 1.0f}, {},{0.0f, 0.0f}}, // 左上
+		{{1.0f,-1.0f, -1.0f}, {},{0.0f, 1.0f}}, // 左下
+		{{1.0f, 1.0f, 1.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{1.0f, 1.0f, -1.0f},{}, {1.0f, 1.0f}}, // 右下
 
 		//下
-		{{-5.0f,5.0f, -5.0f}, {},{0.0f, 1.0f}}, // 左下
-		{{-5.0f, 5.0f, 5.0f}, {},{0.0f, 0.0f}}, // 左上
-		{{5.0f, 5.0f, -5.0f},{}, {1.0f, 1.0f}}, // 右下
-		{{5.0f, 5.0f, 5.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{-1.0f,1.0f, -1.0f}, {},{0.0f, 1.0f}}, // 左下
+		{{-1.0f, 1.0f, 1.0f}, {},{0.0f, 0.0f}}, // 左上
+		{{1.0f, 1.0f, -1.0f},{}, {1.0f, 1.0f}}, // 右下
+		{{1.0f, 1.0f, 1.0f}, {},{1.0f, 0.0f}}, // 右上
 
 		//上
-		{{-5.0f, -5.0f, -5.0f},{}, {0.0f, 0.0f}}, // 左上
-		{{-5.0f, -5.0f, 5.0f},{}, {0.0f, 0.0f}}, // 左下
-		{{5.0f, -5.0f,  -5.0f}, {},{1.0f, 0.0f}}, // 右上
-		{{5.0f, -5.0f, 5.0f},{}, {1.0f, 0.0f}}, // 右下
+		{{-1.0f, -1.0f, -1.0f},{}, {0.0f, 0.0f}}, // 左上
+		{{-1.0f, -1.0f, 1.0f},{}, {0.0f, 0.0f}}, // 左下
+		{{1.0f, -1.0f,  -1.0f}, {},{1.0f, 0.0f}}, // 右上
+		{{1.0f, -1.0f, 1.0f},{}, {1.0f, 0.0f}}, // 右下
 
 	};
 
@@ -935,7 +935,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	PlayerInitialize(&playerObj, device);
 
 	//--------自機弾初期化---------
-	PlayerBulletObject3d playerBulletObj;
+	PlayerBulletObject3d playerBulletObj[3];
 
 	//PlayerBulletInitialize(&playerBulletObj, device);
 
@@ -1374,7 +1374,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			cameramode = 0;
 
 			//自機
-			PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj);
+			PlayerUpdate(input, &playerObj, matView, matProjection, device, playerBulletObj[shot]);
 
 			//弾
 
@@ -1385,18 +1385,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				Vector3 velocity(0, 0, kBulletSpeed);
 
 				//速度ベクトルを自機の向きに合わせて回転させる
-				velocity = transform(velocity, rotateX(playerBulletObj.rotation.x));
+				velocity = transform(velocity, rotateX(playerBulletObj[shot].rotation.x));
 
 				Vector3 pos(playerObj.position.x, playerObj.position.y, playerObj.position.z);
 
 				//弾を生成し初期化
-				PlayerBulletInitialize(&playerBulletObj, device, pos, velocity);
+				PlayerBulletInitialize(&playerBulletObj[shot], device, pos, velocity);
 
 			}
 			else if (playerObj.mode == 3) {
 
-				if (playerBulletObj.isDead_ == false) {
-					PlayerBulletUpdate(&playerBulletObj, matView, matProjection);
+				if (playerBulletObj[shot].isDead_ == false) {
+					PlayerBulletUpdate(&playerBulletObj[shot], matView, matProjection);
 				}
 				else {
 
@@ -1427,15 +1427,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 						PaperAirplaneInitialize(&paperAirplaneObjs[i], matView, matProjection, device);
 						paperAirplaneObjs[i].position.z = paperObj.trans[i].z;
 						paperAirplaneObjs[i].position.x = paperObj.trans[i].x;
+						paperAirplaneObjs[i].position.y = paperObj.trans[i].y;
+
 						paperAirplaneObjs[i].rotation.y = paperObj.rot[i].y;
 
 					}
 					else {
 						PaperCircleInitialize(&paperCircleObjs[i], matView, matProjection, device);
-						paperCircleObjs[i].position.z = paperObj.trans[i].z;;
+						paperCircleObjs[i].position.z = paperObj.trans[i].z;
 						paperCircleObjs[i].position.x = paperObj.trans[i].x;
+						paperCircleObjs[i].position.y = paperObj.trans[i].y;
+
 						paperCircleObjs[i].rotation.y = paperObj.rot[i].y;
 					}
+
+					if (paperObj.type[i] == 0) {
+						paperCircleObjs[i].position.z = 1000;
+						paperCircleObjs[i].position.x = 1000;
+						paperCircleObjs[i].position.y = 1000;
+					}
+					else {
+						paperAirplaneObjs[i].position.z = 1000;
+						paperAirplaneObjs[i].position.x = 1000;
+						paperAirplaneObjs[i].position.y = 1000;
+					}
+
 				}
 
 				//Update
@@ -1656,6 +1672,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				PlayerReset(&playerObj);
 
+				for (int i = 0; i < 3; i++) {
+					playerBulletObj[i].isDead_ = false;
+					playerBulletObj[i].position.y = 1000;
+				}
+
 			}
 
 			if (paperObj.type[beginshot[0]] == 0) {
@@ -1697,54 +1718,57 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//}
 
 		//------------当たり判定---------------
-			//判定対象AとBの座標
-		Vector3 posA, posB;
+		 
+		if (scene == 1 && paperObj.flag >= 3) {
 
-		////自弾リストの取得
-		//const std::list<std::unique_ptr<FanWind>>& fanWinds = fan_->GetBullets();
+			//判定対象AとBの座標
+			Vector3 posA, posB;
+
+			////自弾リストの取得
+			//const std::list<std::unique_ptr<FanWind>>& fanWinds = fan_->GetBullets();
 
 #pragma region 自弾と敵弾の当たり判定
 
 			//自弾と敵弾の当たり判定
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 10; j++) {
+				for (int i = 0; i < 10; i++) {
 
-				//自弾の座標
-				posA = Vector3(playerBulletObj.position.x, playerBulletObj.position.y, playerBulletObj.position.z);
-				//敵弾の座標
-				if (paperObj.type[j] == 0) {
-					posB = Vector3(paperAirplaneObjs[j].position.x, paperAirplaneObjs[j].position.y, paperAirplaneObjs[j].position.z);
-				}
-				else {
-					posB = Vector3(paperCircleObjs[j].position.x, paperCircleObjs[j].position.y, paperCircleObjs[j].position.z);
-				}
-
-				//半径
-				float posAR = 5;
-				float posBR = 5;
-
-				if (((posA.x - posB.x) * (posA.x - posB.x)) + ((posA.y - posB.y) * (posA.y - posB.y)) + ((posA.z - posB.z) * (posA.z - posB.z)) <= ((posAR + posBR) * (posAR + posBR))) {
-
-
-					PaperOnCollision(j, &paperObj);
-					//自弾の衝突時コールバックを呼び出す
-					playerBulletObj.isDead_ = true;
-					//敵弾の衝突時コールバックを呼び出す
-					if (paperObj.type[j] == 0) {
-						PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[j]);
+					//自弾の座標
+					posA = Vector3(playerBulletObj[shot].position.x, playerBulletObj[shot].position.y, playerBulletObj[shot].position.z);
+					//敵弾の座標
+					if (paperObj.type[i] == 0) {
+						posB = Vector3(paperAirplaneObjs[i].position.x, paperAirplaneObjs[i].position.y, paperAirplaneObjs[i].position.z);
 					}
 					else {
-						PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[j]);
+						posB = Vector3(paperCircleObjs[i].position.x, paperCircleObjs[i].position.y, paperCircleObjs[i].position.z);
 					}
 
-					touchPaperNum = j;
+					//半径
+					float posAR = 1;
+					float posBR = 1;
 
-					//debugText_->SetPos(0, 40);
-					//debugText_->Printf("atatta");
-				}
+					if (((posA.x - posB.x) * (posA.x - posB.x)) + ((posA.y - posB.y) * (posA.y - posB.y)) + ((posA.z - posB.z) * (posA.z - posB.z)) <= ((posAR + posBR) * (posAR + posBR))) {
+
+
+						PaperOnCollision(i, &paperObj);
+						//自弾の衝突時コールバックを呼び出す
+						playerBulletObj[shot].isDead_ = true;
+						//敵弾の衝突時コールバックを呼び出す
+						if (paperObj.type[i] == 0) {
+							PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
+						}
+						else {
+							PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
+						}
+
+						touchPaperNum = i;
+
+						//debugText_->SetPos(0, 40);
+						//debugText_->Printf("atatta");
+					}
+				
 			}
-		}
 #pragma endregion
+		}
 
 		//更新処理-ここまで
 
@@ -1813,8 +1837,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle = srvHeap->GetGPUDescriptorHandleForHeapStart();
 		
 		// SRVヒープの先頭にあるSRVをルートパラメータ1番に設定
-		srvGpuHandle.ptr += incrementSize;
-		commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
+		//srvGpuHandle.ptr += incrementSize;
+		//commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 
 		//for (int i = 0; i < _countof(object3ds); i++) {
@@ -1826,13 +1850,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		if (scene == 1 || scene == 2 || scene == 3) {
 
-			incrementSize = 0;
-			srvGpuHandle.ptr = incrementSize;
-
-			PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices));
-			if (playerObj.mode == 3) {
-				if (playerBulletObj.isDead_ == false) {
-					PlayerBulletDraw(&playerBulletObj, commandList, vbView, ibView, _countof(indices));
+			if (scene != 2) {
+				PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
+				if (playerObj.mode == 3 && shot <= 2) {
+					if (playerBulletObj[shot].isDead_ == false) {
+						PlayerBulletDraw(&playerBulletObj[shot], commandList, vbView, ibView, _countof(indices));
+					}
 				}
 			}
 
@@ -1842,15 +1865,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 					if (paperObj.type[i] == 0) {
 						incrementSize = 0;
-						srvGpuHandle.ptr = incrementSize;
-			
-						PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices));
+						PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices),srvGpuHandle, incrementSize);
 					}
 					else {
 						incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-						srvGpuHandle.ptr = incrementSize;
-				
-						PaperCircleDraw(&paperCircleObjs[i], commandList, vbView, ibView, _countof(indices));
+						PaperCircleDraw(&paperCircleObjs[i], commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 					}
 
 				}
@@ -2064,7 +2083,10 @@ void PlayerUpdate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMA
 };
 
 //描画
-void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += incrementSize;
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// 頂点バッファビューの設定コマンド
 	commandList->IASetVertexBuffers(0, 1, &vbView);
@@ -2579,7 +2601,10 @@ void PaperAirplaneUpdate(PaperAirplaneObject3d* object, XMMATRIX& matView, XMMAT
 }
 
 
-void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+void PaperAirplaneDraw(PaperAirplaneObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += incrementSize;
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// インデックスバッファビューの設定コマンド
 	commandList->IASetIndexBuffer(&ibView);
@@ -2749,7 +2774,10 @@ void PaperCircleUpdate(PaperCircleObject3d* object, XMMATRIX& matView, XMMATRIX&
 }
 
 
-void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+void PaperCircleDraw(PaperCircleObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += incrementSize;
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// インデックスバッファビューの設定コマンド
 	commandList->IASetIndexBuffer(&ibView);
