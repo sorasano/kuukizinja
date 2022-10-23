@@ -1478,6 +1478,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			}
 
+			//弾を外した時用
+			if (playerBulletObj[shot].position.z >= 10) {
+
+				playerBulletObj[shot].position.z = -100;
+				playerBulletObj[shot].position.y = 100;
+				playerBulletObj[shot].isDead_ = true;
+				shot++;
+				isLand = 1;
+				scene = 2;
+
+			}
 		}
 		else if (scene == 2) {
 
