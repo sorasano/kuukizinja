@@ -37,28 +37,67 @@ using namespace std;
 
 #include <random>
 
+#include <D3dx12.h>
+
 const double PI = 3.141592653589;
 
-// 定数バッファ用データ構造体（マテリアル）
-struct ConstBufferDataMaterial {
+// 定数バッファ用データ構造体（マテリアル）,（3D変換行列）
+struct ConstBufferData {
 	XMFLOAT4 color; // 色 (RGBA)
+	XMMATRIX mat; //座標
 };
 
 // 定数バッファ用データ構造体（3D変換行列）
 struct ConstBufferDataTransform {
-	XMMATRIX mat; // 色 (RGBA)
+	XMMATRIX mat; // 座標
 };
 
 //パイプラインセット
 struct PipelineSet {
+
 	ComPtr<ID3D12PipelineState> pipelinestate;
 
 	ComPtr<ID3D12RootSignature> rootsignature;
+
 };
 
 PipelineSet Object3dCreateGraphicsPipeline(ID3D12Device* dev);
 
 PipelineSet SpriteCreateGraphicsPipeline(ID3D12Device* dev);
+
+//-----------スプライト----------
+
+//スプライト用
+struct VertexPosUv {
+	XMFLOAT3 pos;
+	XMFLOAT2 uv;
+};
+
+//スプライト1枚分のデータ
+struct Sprite {
+	//頂点バッファ
+	ComPtr<ID3D12Resource> vertBuff;
+	//頂点バッファビュー
+	D3D12_VERTEX_BUFFER_VIEW vbView{};
+	//定数バッファ
+	ComPtr<ID3D12Resource> constBuff;
+};
+
+//スプライトの共通データ
+struct SpriteCommon {
+	//パイプラインセット
+	PipelineSet pipelineSet;
+};
+
+//スプライト生成
+Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height);
+
+//スプライト共通グラフィックスコマンドのセット
+void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList,const PipelineSet& pipelineSet,ID3D12DescriptorHeap* descHeap);
+
+//スプライト単体描画
+
+void SpriteDraw(const Sprite& sprite, ID3D12GraphicsCommandList* cmdList);
 
 //3Dオブジェクト型
 struct Object3d {
@@ -628,11 +667,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	//-----------スプライト----------
 
-	//スプライト用
-	struct VertexPosUv {
-		XMFLOAT3 pos;
-		XMFLOAT2 uv;
-	};
+	Sprite sprite;
+
+	//スプライトの生成
+	sprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
 
 	//----------3dobjecct---------
 
@@ -828,7 +866,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// リソース設定
 	D3D12_RESOURCE_DESC cbResourceDesc{};
 	cbResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	cbResourceDesc.Width = (sizeof(ConstBufferDataMaterial) + 0xff) & ~0xff;   // 256バイトアラインメント
+	cbResourceDesc.Width = (sizeof(ConstBufferData) + 0xff) & ~0xff;   // 256バイトアラインメント
 	cbResourceDesc.Height = 1;
 	cbResourceDesc.DepthOrArraySize = 1;
 	cbResourceDesc.MipLevels = 1;
@@ -848,7 +886,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(result));
 
 	// 定数バッファのマッピング
-	ConstBufferDataMaterial* constMapMaterial = nullptr;
+	ConstBufferData* constMapMaterial = nullptr;
 	result = constBuffMaterial->Map(0, nullptr, (void**)&constMapMaterial); // マッピング
 	assert(SUCCEEDED(result));
 
@@ -1560,7 +1598,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//}
 
 		//------------当たり判定---------------
-		 
+
 		if (scene == 1 && paperObj.flag >= 3) {
 
 			//判定対象AとBの座標
@@ -1572,42 +1610,42 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #pragma region 自弾と敵弾の当たり判定
 
 			//自弾と敵弾の当たり判定
-				for (int i = 0; i < 10; i++) {
+			for (int i = 0; i < 10; i++) {
 
-					//自弾の座標
-					posA = Vector3(playerBulletObj[shot].position.x, playerBulletObj[shot].position.y, playerBulletObj[shot].position.z);
-					//敵弾の座標
+				//自弾の座標
+				posA = Vector3(playerBulletObj[shot].position.x, playerBulletObj[shot].position.y, playerBulletObj[shot].position.z);
+				//敵弾の座標
+				if (paperObj.type[i] == 0) {
+					posB = Vector3(paperAirplaneObjs[i].position.x, paperAirplaneObjs[i].position.y, paperAirplaneObjs[i].position.z);
+				}
+				else {
+					posB = Vector3(paperCircleObjs[i].position.x, paperCircleObjs[i].position.y, paperCircleObjs[i].position.z);
+				}
+
+				//半径
+				float posAR = 1;
+				float posBR = 1;
+
+				if (((posA.x - posB.x) * (posA.x - posB.x)) + ((posA.y - posB.y) * (posA.y - posB.y)) + ((posA.z - posB.z) * (posA.z - posB.z)) <= ((posAR + posBR) * (posAR + posBR))) {
+
+
+					PaperOnCollision(i, &paperObj);
+					//自弾の衝突時コールバックを呼び出す
+					playerBulletObj[shot].isDead_ = true;
+					//敵弾の衝突時コールバックを呼び出す
 					if (paperObj.type[i] == 0) {
-						posB = Vector3(paperAirplaneObjs[i].position.x, paperAirplaneObjs[i].position.y, paperAirplaneObjs[i].position.z);
+						PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
 					}
 					else {
-						posB = Vector3(paperCircleObjs[i].position.x, paperCircleObjs[i].position.y, paperCircleObjs[i].position.z);
+						PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
 					}
 
-					//半径
-					float posAR = 1;
-					float posBR = 1;
+					touchPaperNum = i;
 
-					if (((posA.x - posB.x) * (posA.x - posB.x)) + ((posA.y - posB.y) * (posA.y - posB.y)) + ((posA.z - posB.z) * (posA.z - posB.z)) <= ((posAR + posBR) * (posAR + posBR))) {
+					//debugText_->SetPos(0, 40);
+					//debugText_->Printf("atatta");
+				}
 
-
-						PaperOnCollision(i, &paperObj);
-						//自弾の衝突時コールバックを呼び出す
-						playerBulletObj[shot].isDead_ = true;
-						//敵弾の衝突時コールバックを呼び出す
-						if (paperObj.type[i] == 0) {
-							PaperAirplaneOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperAirplaneObjs[i]);
-						}
-						else {
-							PaperCircleOnCollision(playerObj.windPower, Vector3(playerObj.position.x, playerObj.position.y, playerObj.position.z), &paperCircleObjs[i]);
-						}
-
-						touchPaperNum = i;
-
-						//debugText_->SetPos(0, 40);
-						//debugText_->Printf("atatta");
-					}
-				
 			}
 #pragma endregion
 		}
@@ -1677,7 +1715,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// SRVヒープの先頭ハンドルを取得（SRVを指しているはず）
 		D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle = srvHeap->GetGPUDescriptorHandleForHeapStart();
-		
+
 		// SRVヒープの先頭にあるSRVをルートパラメータ1番に設定
 		//srvGpuHandle.ptr += incrementSize;
 		//commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
@@ -1707,7 +1745,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 					if (paperObj.type[i] == 0) {
 						incrementSize = 0;
-						PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices),srvGpuHandle, incrementSize);
+						PaperAirplaneDraw(&paperAirplaneObjs[i], commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 					}
 					else {
 						incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1717,6 +1755,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				}
 			}
 		}
+
+		//スプライト共通コマンド
+		SpriteCommonBeginDraw(commandList.Get(), spritePipelineSet, srvHeap.Get());
+
+		//スプライト描画
+		SpriteDraw(sprite,commandList.Get());
 
 		// ４．描画コマンドここまで
 
@@ -2708,7 +2752,7 @@ void PaperCircleReset(PaperCircleObject3d* object) {
 }
 
 PipelineSet Object3dCreateGraphicsPipeline(ID3D12Device* dev) {
-	
+
 	HRESULT result;
 	ComPtr<ID3DBlob> vsBlob; // 頂点シェーダオブジェクト
 	ComPtr<ID3DBlob> psBlob; // ピクセルシェーダオブジェクト
@@ -3102,4 +3146,106 @@ PipelineSet SpriteCreateGraphicsPipeline(ID3D12Device* dev) {
 
 	//パイプラインとルートシグネチャを返す
 	return pipelineSet;
+}
+
+Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height) {
+
+	HRESULT result = S_FALSE;
+
+	//新しいスプライトを作る
+	Sprite sprite{};
+
+	//頂点データ
+	VertexPosUv vertices[] = {
+		{{	0.0f, 100.0f,	0.0f},{0.0f,1.0f}},
+		{{	0.0f,	0.0f,	0.0f},{0.0f,0.0f}},
+		{{100.0f, 100.0f,	0.0f},{1.0f,1.0f}},
+		{{100.0f,	0.0f,	0.0f},{1.0f,0.0f}},
+	};
+
+	// ヒーププロパティ
+	CD3DX12_HEAP_PROPERTIES heapPropsVertexBuffer = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	// リソース設定
+	CD3DX12_RESOURCE_DESC resourceDescVertexBuffer =
+		CD3DX12_RESOURCE_DESC::Buffer(sizeof(VertexPosUv) * 4);
+
+	//頂点バッファ生成
+	result = dev->CreateCommittedResource(
+		&heapPropsVertexBuffer, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDescVertexBuffer, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&sprite.vertBuff));
+	assert(SUCCEEDED(result));
+
+	//頂点バッファへのデータ転送
+	VertexPosUv* vertMap = nullptr;
+	result = sprite.vertBuff->Map(0, nullptr, (void**)&vertMap);
+	memcpy(vertMap,vertices,sizeof(vertices));
+	sprite.vertBuff->Unmap(0,nullptr);
+
+	// 頂点バッファビューの作成
+	// GPU仮想アドレス
+	sprite.vbView.BufferLocation = sprite.vertBuff->GetGPUVirtualAddress();
+	// 頂点バッファのサイズ
+	sprite.vbView.SizeInBytes = sizeof(vertices);
+	// 頂点1つ分のデータサイズ
+	sprite.vbView.StrideInBytes = sizeof(vertices[0]);
+
+	// ヒーププロパティ
+	CD3DX12_HEAP_PROPERTIES heapPropsConstantBuffer = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	// リソース設定
+	CD3DX12_RESOURCE_DESC resourceDescConstantBuffer =
+		CD3DX12_RESOURCE_DESC::Buffer((sizeof(ConstBufferData) + 0xff) & ~0xff);
+
+	// 定数バッファの生成
+	result = dev->CreateCommittedResource(
+		&heapPropsConstantBuffer, // ヒープ設定
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDescConstantBuffer, // リソース設定
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&sprite.constBuff));
+	assert(SUCCEEDED(result));
+
+	// 定数バッファにデータ転送
+	ConstBufferData* constMap = nullptr;
+	result = sprite.constBuff->Map(0, nullptr, (void**)&constMap); // マッピング
+	constMap->color = XMFLOAT4(1,1,1,1);
+	assert(SUCCEEDED(result));
+
+	//平行投影行列
+	constMap->mat = XMMatrixOrthographicOffCenterLH(0.0f, window_width, window_height,0.0f,0.0f,1.0f);
+	sprite.constBuff->Unmap(0,nullptr);
+
+	return sprite;
+}
+//スプライト共通グラフィックスコマンドのセット
+void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList, const PipelineSet& pipelineSet, ID3D12DescriptorHeap* descHeap) {
+
+	// パイプラインステートとルートシグネチャの設定コマンド
+	cmdList->SetPipelineState(pipelineSet.pipelinestate.Get());
+	cmdList->SetGraphicsRootSignature(pipelineSet.rootsignature.Get());
+
+	// プリミティブ形状の設定コマンド
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // 三角形リスト
+
+	//テクスチャ用でスクリプタヒープの設定
+	ID3D12DescriptorHeap* ppHeaps[] = { descHeap };
+	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+}
+
+//スプライト単体描画
+
+void SpriteDraw(const Sprite& sprite, ID3D12GraphicsCommandList* cmdList) {
+
+	// 頂点バッファの設定コマンド
+	cmdList->IASetVertexBuffers(0, 1, &sprite.vbView);
+
+	// 定数バッファ(CBV)の設定コマンド
+	cmdList->SetGraphicsRootConstantBufferView(0,sprite.vertBuff->GetGPUVirtualAddress());
+
+	//ポリゴンの描画
+	cmdList->DrawInstanced(4,1,0,0);
 }
