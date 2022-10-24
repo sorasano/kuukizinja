@@ -2800,6 +2800,7 @@ void PaperCircleReset(PaperCircleObject3d* object) {
 
 PipelineSet Object3dCreateGraphicsPipeline(ID3D12Device* dev) {
 
+
 	HRESULT result;
 	ComPtr<ID3DBlob> vsBlob; // 頂点シェーダオブジェクト
 	ComPtr<ID3DBlob> psBlob; // ピクセルシェーダオブジェクト
@@ -2884,31 +2885,24 @@ PipelineSet Object3dCreateGraphicsPipeline(ID3D12Device* dev) {
 	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange.BaseShaderRegister = 0;     //テクスチャレジスタ0番
 	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-	// デスクリプタレンジの設定
-	//CD3DX12_DESCRIPTOR_RANGE descriptorRange{};
-	//descriptorRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 
 	// ルートパラメータの設定
-	//D3D12_ROOT_PARAMETER rootParams[3] = {};
-	//// 定数バッファ0番
-	//rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   // 種類
-	//rootParams[0].Descriptor.ShaderRegister = 0;                   // 定数バッファ番号
-	//rootParams[0].Descriptor.RegisterSpace = 0;                    // デフォルト値
-	//rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;  // 全てのシェーダから見える
-	//// テクスチャレジスタ0番
-	//rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;   //種類
-	//rootParams[1].DescriptorTable.pDescriptorRanges = &descriptorRange;		  //デスクリプタレンジ
-	//rootParams[1].DescriptorTable.NumDescriptorRanges = 1;              		  //デスクリプタレンジ数
-	//rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;               //全てのシェーダから見える
-	//// 定数バッファ1番
-	//rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   //種類
-	//rootParams[2].Descriptor.ShaderRegister = 1;		  //デスクリプタレンジ
-	//rootParams[2].Descriptor.RegisterSpace = 0;              		  //デスクリプタレンジ数
-	//rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;                // デフォルト値
-	CD3DX12_ROOT_PARAMETER rootParams[2];
-	rootParams[0].InitAsConstantBufferView(0);
-	rootParams[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_ALL);
-
+	D3D12_ROOT_PARAMETER rootParams[3] = {};
+	// 定数バッファ0番
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   // 種類
+	rootParams[0].Descriptor.ShaderRegister = 0;                   // 定数バッファ番号
+	rootParams[0].Descriptor.RegisterSpace = 0;                    // デフォルト値
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;  // 全てのシェーダから見える
+	// テクスチャレジスタ0番
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;   //種類
+	rootParams[1].DescriptorTable.pDescriptorRanges = &descriptorRange;		  //デスクリプタレンジ
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;              		  //デスクリプタレンジ数
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;               //全てのシェーダから見える
+	// 定数バッファ1番
+	rootParams[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;   //種類
+	rootParams[2].Descriptor.ShaderRegister = 1;		  //デスクリプタレンジ
+	rootParams[2].Descriptor.RegisterSpace = 0;              		  //デスクリプタレンジ数
+	rootParams[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;                // デフォルト値
 
 	// テクスチャサンプラーの設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc{};
@@ -3221,10 +3215,10 @@ Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height) {
 
 	//頂点データ
 	VertexPosUv vertices[] = {
-		{{	0.0f, 10.0f,	0.0f},{0.0f,1.0f}},
+		{{	0.0f, 100.0f,	0.0f},{0.0f,1.0f}},
 		{{	0.0f,	0.0f,	0.0f},{0.0f,0.0f}},
-		{{10.0f, 10.0f,	0.0f},{1.0f,1.0f}},
-		{{10.0f,	0.0f,	0.0f},{1.0f,0.0f}},
+		{{100.0f, 100.0f,	0.0f},{1.0f,1.0f}},
+		{{100.0f,	0.0f,	0.0f},{1.0f,0.0f}},
 	};
 
 	// ヒーププロパティ
@@ -3295,9 +3289,9 @@ void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList, const SpriteCommo
 	// プリミティブ形状の設定コマンド
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP); // 三角形リスト
 
-	////テクスチャ用でスクリプタヒープの設定
-	//ID3D12DescriptorHeap* ppHeaps[] = { nullptr };
-	//cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+	//テクスチャ用でスクリプタヒープの設定
+	ID3D12DescriptorHeap* ppHeaps[] = { spriteCommon.descHeap.Get()};
+	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 }
 
 //スプライト単体描画
