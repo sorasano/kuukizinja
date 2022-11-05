@@ -30,6 +30,151 @@ using namespace std;
 
 #include "WinApp.h"
 
+//音
+
+#include <xaudio2.h>
+#pragma comment(lib,"xaudio2.lib")
+
+#include <fstream>
+
+//音声データ読み込み(.wav)
+
+//チャンクヘッダ
+struct ChunkHeader {
+	char id[4]; // チャンク毎のID
+	int32_t size;// チャンクサイズ
+};
+
+//RIFFヘッダチャンク
+struct RiffHeader {
+	ChunkHeader chunk; // "RIFF"
+	char type[4]; // "WAVE"
+};
+
+//FMTチャンク
+struct FormatChunk {
+	ChunkHeader chunk; // "fmt"
+	WAVEFORMATEX fmt; //　波形フォーマット
+};
+
+//音声データ
+struct SoundData {
+
+	//　波形フォーマット
+	WAVEFORMATEX wfex;
+	// バッファの先頭アドレス
+	BYTE* pBuffer;
+	// バッファのサイズ
+	unsigned int bufferSize;
+
+};
+
+SoundData SoundLoadWave(const char* filename) {
+	
+	HRESULT result;
+
+	//-----ファイルオープン------
+	
+	//ファイル入力ストリームのインスタンス
+	std::ifstream file;
+	//.wavファイルをバイナリーモードで開く
+	file.open(filename, std::ios_base::binary);
+	//ファイルオープン失敗を検出する
+	assert(file.is_open());
+
+	//-----.wavデータ読み込み-----
+
+	//RIFFヘッダーの読み込み
+	RiffHeader riff;
+	file.read((char*)&riff,sizeof(riff));
+	//ファイル化RIFFかチェック
+	if (strncmp(riff.chunk.id, "RIFF", 4) != 0) {
+		assert(0);
+	}
+	//ファイル化WAVEかチェック
+	if (strncmp(riff.type, "WAVE", 4) != 0) {
+		assert(0);
+	}
+
+	//Formatチャンクの読み込み
+	FormatChunk format = {};
+	//チャンクヘッダ―の確認
+	file.read((char*)&format, sizeof(ChunkHeader));
+	if (strncmp(format.chunk.id, "fmt ", 4) != 0) {
+		assert(0);
+	}
+
+	//チャンク本体の読み込み
+	assert(format.chunk.size <= sizeof(format.fmt));
+	file.read((char*)&format.fmt, format.chunk.size);
+
+	//Dataチャンクの読み込み
+	ChunkHeader data;
+	file.read((char*)&data,sizeof(data));
+	//JUNKチャンクを検出した場合
+	if (strncmp(data.id, "JUNK ", 4) == 0) {
+		//読み取り位置をJUNKチャンクの終わりまで進める
+		file.seekg(data.size, std::ios_base::cur);
+		//再読み込み
+		file.read((char*)&data,sizeof(data));
+	}
+
+	if (strncmp(data.id, "data ", 4) != 0) {
+		assert(0);
+	}
+
+	//Dataチャンクのデータ部(波形データ)の読み込み
+	char* pBuffer = new char[data.size];
+	file.read(pBuffer,data.size);
+
+	//Waveファイルを閉じる
+	file.close();
+
+	//------読み込んだ音声データをreturn------
+
+	//returnするための音声データ
+	SoundData soundData = {};
+
+	soundData.wfex = format.fmt;
+	soundData.pBuffer = reinterpret_cast<BYTE*>(pBuffer);
+	soundData.bufferSize = data.size;
+
+	return soundData;
+}
+
+//音声データ解放
+void SoundUnload(SoundData* soundData) {
+	
+	//バッファのメモリを解放
+	delete[] soundData->pBuffer;
+
+	soundData->pBuffer = 0;
+	soundData->bufferSize = 0;
+	soundData->wfex = {};
+
+}
+
+//音声再生
+void SoundPlayWave(IXAudio2* xAudio2,const SoundData& soundData) {
+
+	HRESULT result;
+
+	//波形フォーマットをもとにSoundVoiceの生成
+	IXAudio2SourceVoice* pSourceVoice = nullptr;
+	result = xAudio2->CreateSourceVoice(&pSourceVoice,&soundData.wfex);
+	assert((SUCCEEDED(result)));
+
+	//再生する波形データの設定
+	XAUDIO2_BUFFER buf{};
+	buf.pAudioData = soundData.pBuffer;
+	buf.AudioBytes = soundData.bufferSize;
+	buf.Flags = XAUDIO2_END_OF_STREAM;
+
+	//波形データの再生
+	result = pSourceVoice->SubmitSourceBuffer(&buf);
+	result = pSourceVoice->Start();
+}
+
 // 定数バッファ用データ構造体（マテリアル）
 struct ConstBufferDataMaterial {
 	XMFLOAT4 color; // 色 (RGBA)
@@ -39,7 +184,6 @@ struct ConstBufferDataMaterial {
 struct ConstBufferDataTransform {
 	XMMATRIX mat; // 色 (RGBA)
 };
-
 
 //3Dオブジェクト型
 struct Object3d {
@@ -248,6 +392,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	////入力開放
 	//delete input;
+	
+	//------音-------
+	ComPtr<IXAudio2> xAudio2;
+	IXAudio2MasteringVoice* masterVoice;
+
+	//XAudioエンジンのインスタンスを生成
+	result = XAudio2Create(&xAudio2,0,XAUDIO2_DEFAULT_PROCESSOR);
+
+	//マスターボイスを生成
+	result = xAudio2->CreateMasteringVoice(&masterVoice);
+
+	//音声読み込み
+	SoundData soundData1 = SoundLoadWave("Resources/Sound/Alarm01.wav");
 
 	// DirectX初期化処理 ここまで
 
@@ -1013,6 +1170,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			else {
 				incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			}
+
+			//音声再生
+			SoundPlayWave(xAudio2.Get(), soundData1);
+
 		}
 
 
@@ -1090,9 +1251,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// インデックスバッファビューの設定コマンド
 		commandList->IASetIndexBuffer(&ibView);
 
-		for (int i = 0; i < _countof(object3ds); i++) {
-			DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
-		}
+		//for (int i = 0; i < _countof(object3ds); i++) {
+		//	DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
+		//}
 
 		////自機描画
 		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
@@ -1136,6 +1297,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// DirectX毎フレーム処理 ここまで
 
 	}
+
+	//XAudio2解放
+	xAudio2.Reset();
+
+	//音声データ解放
+	SoundUnload(&soundData1);
 
 	//コンソールへの文字出力
 	OutputDebugStringA("Hello,DirectX!!\n");
