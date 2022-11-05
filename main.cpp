@@ -89,6 +89,8 @@ struct Sprite {
 	XMMATRIX matWorld;
 
 	UINT texNumber = 0;
+
+	XMFLOAT2 size = { 100,100 };
 };
 
 //テクスチャの最大枚数
@@ -116,7 +118,7 @@ Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height);
 SpriteCommon SpriteCommonCreate(ID3D12Device* dev, int window_width, int window_height);
 
 //スプライト共通グラフィックスコマンドのセット
-void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList,const SpriteCommon& spriteCommon,ID3D12DescriptorHeap* descHeap);
+void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList, const SpriteCommon& spriteCommon, ID3D12DescriptorHeap* descHeap);
 
 //スプライト単体描画
 
@@ -126,7 +128,10 @@ void SpriteDraw(const Sprite& sprite, ID3D12GraphicsCommandList* cmdList, const 
 void SpriteUpdate(Sprite& sprite, const SpriteCommon& spriteCommon);
 
 //スプライト共通テクスチャ読み込み
-void SpriteCommonLoadTexture(SpriteCommon& spriteCommon,UINT texnumber,const wchar_t*filename,ID3D12Device* dev);
+void SpriteCommonLoadTexture(SpriteCommon& spriteCommon, UINT texnumber, const wchar_t* filename, ID3D12Device* dev);
+
+//スプライト単体頂点バッファの転送
+void SpriteTransferVertexBuffer(const Sprite& sprite);
 
 //3Dオブジェクト型
 struct Object3d {
@@ -149,7 +154,7 @@ void InitializeObject3d(Object3d* object, ComPtr<ID3D12Device> device);
 
 void UpdateObject3d(Object3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
 //---------------自機-----------------
 
@@ -379,7 +384,7 @@ void PlayerBulletInitialize(PlayerBulletObject3d* object, ComPtr<ID3D12Device> d
 
 void PlayerBulletUpdate(PlayerBulletObject3d* object, XMMATRIX& matView, XMMATRIX& matProjection);
 
-void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices);
+void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize);
 
 bool PlayerBulletIsDead(PlayerBulletObject3d* object) { return  object->isDead_; }
 
@@ -700,10 +705,83 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//スプライト共通データ生成
 	SpriteCommon spriteCommon;
 	spriteCommon = SpriteCommonCreate(device.Get(), WinApp::window_width, WinApp::window_height);
-	
+
 	//スプライトテクスチャ読み込み
-	SpriteCommonLoadTexture(spriteCommon, 0, L"Resources/title.png", device.Get());
+	//タイトル
+	SpriteCommonLoadTexture(spriteCommon, 0, L"Resources/UI/rule.png", device.Get());
+	//クリア画面
 	SpriteCommonLoadTexture(spriteCommon, 1, L"Resources/clear.png", device.Get());
+
+	//---UI---
+
+	//パワーゲージ内,外
+	SpriteCommonLoadTexture(spriteCommon, 2, L"Resources/UI/powerGaugeIn.png", device.Get());
+	//クリア画面
+	SpriteCommonLoadTexture(spriteCommon, 3, L"Resources/UI/powerGaugeFlame.png", device.Get());
+
+	//くじ
+	//大吉
+	SpriteCommonLoadTexture(spriteCommon, 4, L"Resources/UI/kuzi/daikiti.png", device.Get());
+	//吉
+	SpriteCommonLoadTexture(spriteCommon, 5, L"Resources/UI/kuzi/kiti.png", device.Get());
+	//中吉
+	SpriteCommonLoadTexture(spriteCommon, 6, L"Resources/UI/kuzi/tyuukiti.png", device.Get());
+	//小吉
+	SpriteCommonLoadTexture(spriteCommon, 7, L"Resources/UI/kuzi/syoukiti.png", device.Get());
+	//凶
+	SpriteCommonLoadTexture(spriteCommon, 8, L"Resources/UI/kuzi/kyou.png", device.Get());
+	//大凶
+	SpriteCommonLoadTexture(spriteCommon, 9, L"Resources/UI/kuzi/daikyou.png", device.Get());
+
+	//数字
+	//0～9
+	SpriteCommonLoadTexture(spriteCommon, 10, L"Resources/UI/number/0.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 11, L"Resources/UI/number/1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 12, L"Resources/UI/number/2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 13, L"Resources/UI/number/3.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 14, L"Resources/UI/number/4.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 15, L"Resources/UI/number/5.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 16, L"Resources/UI/number/6.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 17, L"Resources/UI/number/7.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 18, L"Resources/UI/number/8.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 19, L"Resources/UI/number/9.png", device.Get());
+
+	//くじ内容
+
+	//大吉
+	SpriteCommonLoadTexture(spriteCommon, 20, L"Resources/UI/kuzi/comment/daikiti1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 21, L"Resources/UI/kuzi/comment/daikiti2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 22, L"Resources/UI/kuzi/comment/daikiti3.png", device.Get());
+
+	//吉
+	SpriteCommonLoadTexture(spriteCommon, 23, L"Resources/UI/kuzi/comment/kiti1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 24, L"Resources/UI/kuzi/comment/kiti2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 25, L"Resources/UI/kuzi/comment/kiti3.png", device.Get());
+
+	//中吉
+	SpriteCommonLoadTexture(spriteCommon, 26, L"Resources/UI/kuzi/comment/tyuukiti1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 27, L"Resources/UI/kuzi/comment/tyuukiti2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 28, L"Resources/UI/kuzi/comment/tyuukiti3.png", device.Get());
+
+	//小吉
+	SpriteCommonLoadTexture(spriteCommon, 29, L"Resources/UI/kuzi/comment/syoukiti1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 30, L"Resources/UI/kuzi/comment/syoukiti2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 31, L"Resources/UI/kuzi/comment/syoukiti3.png", device.Get());
+
+	//凶
+	SpriteCommonLoadTexture(spriteCommon, 32, L"Resources/UI/kuzi/comment/kyou1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 33, L"Resources/UI/kuzi/comment/kyou2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 34, L"Resources/UI/kuzi/comment/kyou3.png", device.Get());
+
+	//大凶
+	SpriteCommonLoadTexture(spriteCommon, 35, L"Resources/UI/kuzi/comment/daikyou1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 36, L"Resources/UI/kuzi/comment/daikyou2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 37, L"Resources/UI/kuzi/comment/daikyou3.png", device.Get());
+
+	//タイトル
+	SpriteCommonLoadTexture(spriteCommon, 38, L"Resources/title/1.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 39, L"Resources/title/2.png", device.Get());
+	SpriteCommonLoadTexture(spriteCommon, 40, L"Resources/title/3.png", device.Get());
 
 	Sprite sprite;
 
@@ -712,6 +790,150 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//スプライトの生成
 	sprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
 
+	sprite.size.x = WinApp::window_width;
+	sprite.size.y = WinApp::window_height;
+	//反映
+	SpriteTransferVertexBuffer(sprite);
+
+	//タイトル
+
+	Sprite titleSprite[3];
+
+	for (int i = 0; i < 3; i++) {
+		//スプライトの生成
+		titleSprite[i] = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+		titleSprite[i].texNumber = 38 + i;
+
+		titleSprite[i].size.x = WinApp::window_width;
+		titleSprite[i].size.y = WinApp::window_height;
+		//反映
+		SpriteTransferVertexBuffer(titleSprite[i]);
+	}
+
+	//クリア
+
+	Sprite clearSprite;
+
+	//スプライトの生成
+	clearSprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+	clearSprite.texNumber = 1;
+
+	clearSprite.size.x = WinApp::window_width / 2;
+	clearSprite.size.y = WinApp::window_height;
+	//反映
+	SpriteTransferVertexBuffer(clearSprite);
+
+	//---UI---
+
+	//操作説明
+
+	Sprite ruleSprite;
+
+	//スプライトの生成
+	ruleSprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+	ruleSprite.texNumber = 0;
+
+	ruleSprite.size.x = 800;
+	ruleSprite.size.y = 64;
+	//反映
+	SpriteTransferVertexBuffer(ruleSprite);
+
+
+	//パワーゲージ中
+
+	Sprite powerGaugeInSprite;
+
+	//スプライトの生成
+	powerGaugeInSprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+	powerGaugeInSprite.texNumber = 2;
+
+	powerGaugeInSprite.size.x = 16;
+	powerGaugeInSprite.size.y = 16;
+	//反映
+	SpriteTransferVertexBuffer(powerGaugeInSprite);
+
+	//パワーゲージ外
+
+	Sprite powerGaugeFlameSprite;
+
+	//スプライトの生成
+	powerGaugeFlameSprite = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+	powerGaugeFlameSprite.texNumber = 3;
+
+	powerGaugeFlameSprite.size.x = 600;
+	powerGaugeFlameSprite.size.y = 30;
+	powerGaugeFlameSprite.position.x = 300;
+	powerGaugeFlameSprite.position.y = 100;
+
+	//反映
+	SpriteTransferVertexBuffer(powerGaugeFlameSprite);
+
+	//スコア
+
+	// 0 shot1 1 shot2 2 shot3 3ハイスコア
+	Sprite scoreSprite[4][4];
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			//スプライトの生成
+			scoreSprite[j][i] = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+			scoreSprite[j][i].texNumber = 10;
+
+			scoreSprite[j][i].size.x = 64;
+			scoreSprite[j][i].size.y = 64;
+			scoreSprite[j][i].position.x = 300 + (i * 64);
+			scoreSprite[j][i].position.y = 100;
+
+			//反映
+			SpriteTransferVertexBuffer(scoreSprite[j][i]);
+		}
+	}
+
+	//くじ内容
+	//0 大吉 1 吉 2 中吉 3小吉 4凶 5大凶
+	Sprite kuziCommentSprite[18];
+
+	for (int i = 0; i < 18; i++) {
+		//スプライトの生成
+		kuziCommentSprite[i] = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+		kuziCommentSprite[i].texNumber = i + 20;
+
+		kuziCommentSprite[i].size.x = 540;
+		kuziCommentSprite[i].size.y = 120;
+		kuziCommentSprite[i].position.x = 370;
+		kuziCommentSprite[i].position.y = 200;
+
+		//反映
+		SpriteTransferVertexBuffer(kuziCommentSprite[i]);
+
+	}
+
+	//くじ
+//0 大吉 1 吉 2 中吉 3小吉 4凶 5大凶
+	Sprite kuziSprite[6];
+
+	for (int i = 0; i < 6; i++) {
+		//スプライトの生成
+		kuziSprite[i] = SpriteCreate(device.Get(), WinApp::window_width, WinApp::window_height);
+
+		kuziSprite[i].texNumber = 4 + i;
+
+		kuziSprite[i].size.x = 128;
+		kuziSprite[i].size.y = 64;
+		kuziSprite[i].position.x = 580;
+		kuziSprite[i].position.y = 80;
+
+		//反映
+		SpriteTransferVertexBuffer(kuziSprite[i]);
+
+	}
 	//----------3dobjecct---------
 
 	// 頂点データ構造体
@@ -930,26 +1152,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	result = constBuffMaterial->Map(0, nullptr, (void**)&constMapMaterial); // マッピング
 	assert(SUCCEEDED(result));
 
-	//3Dオブジェクトの数
-	const size_t kObjectCount = 50;
+	////3Dオブジェクトの数
+	//const size_t kObjectCount = 50;
 	//3dオブジェクトの配列
-	Object3d object3ds[kObjectCount];
+	Object3d groundObj;
+	InitializeObject3d(&groundObj, device);
 
-	//配列内の全オブジェクトに対して
-	for (int i = 0; i < _countof(object3ds); i++) {
-		//初期化
-		InitializeObject3d(&object3ds[i], device);
+	groundObj.scale = { 50.0f,1.0f, 1000.0f };
+	groundObj.rotation = { 0.0f,0.0f,0.0f };
+	groundObj.position = { 0.0f,-21.0f,0.0f };
 
-		//先頭以外なら
-		if (i > 0) {
-			//ひとつ前のオブジェクトを親オブジェクトとする
-			object3ds[i].parent = &object3ds[i - 1];
+	////配列内の全オブジェクトに対して
+	//for (int i = 0; i < _countof(object3ds); i++) {
+	//	//初期化
+	//	InitializeObject3d(&object3ds[i], device);
 
-			object3ds[i].scale = { 0.9f, 0.9f, 0.9f };
-			object3ds[i].rotation = { 0.0f,0.0f,30.0f };
-			object3ds[i].position = { 0.0f,0.0f,-8.0f };
-		}
-	}
+	//	//先頭以外なら
+	//	if (i > 0) {
+	//		//ひとつ前のオブジェクトを親オブジェクトとする
+	//		object3ds[i].parent = &object3ds[i - 1];
+
+	//		object3ds[i].scale = { 0.9f, 0.9f, 0.9f };
+	//		object3ds[i].rotation = { 0.0f,0.0f,30.0f };
+	//		object3ds[i].position = { 0.0f,0.0f,-8.0f };
+	//	}
+	//}
 
 	//------自機の初期化--------
 	PlayerObject3d playerObj;
@@ -1017,7 +1244,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//何番をもう打ったか
 	int beginshot[3] = {};
 
-	float highScore = 0;
+	int highScore = 0;
+
+	//スコア
+	int score[3] = {};
+
+	int kuzi = 0;
+
+	int kuziComment = 0;
+
+	//タイトル画像変更
+	int titleNum = 0;
+
+	int titleCoolTimer = 0;
+	int titleCoolTime = 100;
 
 	//座標変換
 
@@ -1181,6 +1421,185 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		assert(SUCCEEDED(result));
 	}
 
+	//3枚目
+
+	TexMetadata metadata3{};
+	ScratchImage scratchImg3{};
+	// WICテクスチャのロード
+	result = LoadFromWICFile(
+		L"Resources/player.png",   //「Resources」フォルダの「texture.png」
+		WIC_FLAGS_NONE,
+		&metadata3, scratchImg3);
+
+	ScratchImage mipChain3{};
+	// ミップマップ生成
+	result = GenerateMipMaps(
+		scratchImg3.GetImages(), scratchImg3.GetImageCount(), scratchImg3.GetMetadata(),
+		TEX_FILTER_DEFAULT, 0, mipChain3);
+	if (SUCCEEDED(result)) {
+		scratchImg3 = std::move(mipChain3);
+		metadata3 = scratchImg3.GetMetadata();
+	}
+
+	// 読み込んだディフューズテクスチャをSRGBとして扱う
+	metadata3.format = MakeSRGB(metadata3.format);
+
+	//テクスチャマッピング↓
+
+	// リソース設定
+	D3D12_RESOURCE_DESC textureResourceDesc3{};
+	textureResourceDesc3.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	textureResourceDesc3.Format = metadata3.format;
+	textureResourceDesc3.Width = metadata3.width;
+	textureResourceDesc3.Height = (UINT)metadata3.height;
+	textureResourceDesc3.DepthOrArraySize = (UINT16)metadata3.arraySize;
+	textureResourceDesc3.MipLevels = (UINT16)metadata3.mipLevels;
+	textureResourceDesc3.SampleDesc.Count = 1;
+
+	// テクスチャバッファの生成
+	ComPtr<ID3D12Resource> texBuff3;
+	result = device->CreateCommittedResource(
+		&textureHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&textureResourceDesc3,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&texBuff3));
+
+	// 全ミップマップについて
+	for (size_t i = 0; i < metadata3.mipLevels; i++) {
+		// ミップマップレベルを指定してイメージを取得
+		const Image* img = scratchImg3.GetImage(i, 0, 0);
+		// テクスチャバッファにデータ転送
+		result = texBuff3->WriteToSubresource(
+			(UINT)i,
+			nullptr,              // 全領域へコピー
+			img->pixels,          // 元データアドレス
+			(UINT)img->rowPitch,  // 1ラインサイズ
+			(UINT)img->slicePitch // 1枚サイズ
+		);
+		assert(SUCCEEDED(result));
+	}
+
+	//4枚目
+
+	TexMetadata metadata4{};
+	ScratchImage scratchImg4{};
+	// WICテクスチャのロード
+	result = LoadFromWICFile(
+		L"Resources/playerBullet.png",   //「Resources」フォルダの「texture.png」
+		WIC_FLAGS_NONE,
+		&metadata4, scratchImg4);
+
+	ScratchImage mipChain4{};
+	// ミップマップ生成
+	result = GenerateMipMaps(
+		scratchImg4.GetImages(), scratchImg4.GetImageCount(), scratchImg4.GetMetadata(),
+		TEX_FILTER_DEFAULT, 0, mipChain4);
+	if (SUCCEEDED(result)) {
+		scratchImg4 = std::move(mipChain4);
+		metadata4 = scratchImg4.GetMetadata();
+	}
+
+	// 読み込んだディフューズテクスチャをSRGBとして扱う
+	metadata4.format = MakeSRGB(metadata4.format);
+
+	//テクスチャマッピング↓
+
+	// リソース設定
+	D3D12_RESOURCE_DESC textureResourceDesc4{};
+	textureResourceDesc4.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	textureResourceDesc4.Format = metadata4.format;
+	textureResourceDesc4.Width = metadata4.width;
+	textureResourceDesc4.Height = (UINT)metadata4.height;
+	textureResourceDesc4.DepthOrArraySize = (UINT16)metadata4.arraySize;
+	textureResourceDesc4.MipLevels = (UINT16)metadata4.mipLevels;
+	textureResourceDesc4.SampleDesc.Count = 1;
+
+	// テクスチャバッファの生成
+	ComPtr<ID3D12Resource> texBuff4;
+	result = device->CreateCommittedResource(
+		&textureHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&textureResourceDesc4,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&texBuff4));
+
+	// 全ミップマップについて
+	for (size_t i = 0; i < metadata4.mipLevels; i++) {
+		// ミップマップレベルを指定してイメージを取得
+		const Image* img = scratchImg4.GetImage(i, 0, 0);
+		// テクスチャバッファにデータ転送
+		result = texBuff4->WriteToSubresource(
+			(UINT)i,
+			nullptr,              // 全領域へコピー
+			img->pixels,          // 元データアドレス
+			(UINT)img->rowPitch,  // 1ラインサイズ
+			(UINT)img->slicePitch // 1枚サイズ
+		);
+		assert(SUCCEEDED(result));
+	}
+
+	//5枚目
+
+	TexMetadata metadata5{};
+	ScratchImage scratchImg5{};
+	// WICテクスチャのロード
+	result = LoadFromWICFile(
+		L"Resources/ground.png",   //「Resources」フォルダの「texture.png」
+		WIC_FLAGS_NONE,
+		&metadata5, scratchImg5);
+
+	ScratchImage mipChain5{};
+	// ミップマップ生成
+	result = GenerateMipMaps(
+		scratchImg5.GetImages(), scratchImg5.GetImageCount(), scratchImg5.GetMetadata(),
+		TEX_FILTER_DEFAULT, 0, mipChain5);
+	if (SUCCEEDED(result)) {
+		scratchImg5 = std::move(mipChain5);
+		metadata5 = scratchImg5.GetMetadata();
+	}
+
+	// 読み込んだディフューズテクスチャをSRGBとして扱う
+	metadata5.format = MakeSRGB(metadata5.format);
+
+	//テクスチャマッピング↓
+
+	// リソース設定
+	D3D12_RESOURCE_DESC textureResourceDesc5{};
+	textureResourceDesc5.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	textureResourceDesc5.Format = metadata5.format;
+	textureResourceDesc5.Width = metadata5.width;
+	textureResourceDesc5.Height = (UINT)metadata5.height;
+	textureResourceDesc5.DepthOrArraySize = (UINT16)metadata5.arraySize;
+	textureResourceDesc5.MipLevels = (UINT16)metadata5.mipLevels;
+	textureResourceDesc5.SampleDesc.Count = 1;
+
+	// テクスチャバッファの生成
+	ComPtr<ID3D12Resource> texBuff5;
+	result = device->CreateCommittedResource(
+		&textureHeapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&textureResourceDesc5,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&texBuff5));
+
+	// 全ミップマップについて
+	for (size_t i = 0; i < metadata5.mipLevels; i++) {
+		// ミップマップレベルを指定してイメージを取得
+		const Image* img = scratchImg5.GetImage(i, 0, 0);
+		// テクスチャバッファにデータ転送
+		result = texBuff5->WriteToSubresource(
+			(UINT)i,
+			nullptr,              // 全領域へコピー
+			img->pixels,          // 元データアドレス
+			(UINT)img->rowPitch,  // 1ラインサイズ
+			(UINT)img->slicePitch // 1枚サイズ
+		);
+		assert(SUCCEEDED(result));
+	}
 	// SRVの最大個数
 	const size_t kMaxSRVCount = 2056;
 
@@ -1223,6 +1642,54 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// ハンドルの指す位置にシェーダーリソースビュー作成
 	device->CreateShaderResourceView(texBuff2.Get(), &srvDesc2, srvHandle);
+
+	//3つ目
+
+	//デスクリプタ 一つハンドルを進める
+	//UINT incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	srvHandle.ptr += incrementSize;
+
+	// シェーダリソースビュー設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc3{};
+	srvDesc3.Format = textureResourceDesc3.Format;
+	srvDesc3.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc3.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc3.Texture2D.MipLevels = textureResourceDesc3.MipLevels;
+
+	// ハンドルの指す位置にシェーダーリソースビュー作成
+	device->CreateShaderResourceView(texBuff3.Get(), &srvDesc3, srvHandle);
+
+	//4つ目
+
+	//デスクリプタ 一つハンドルを進める
+	//UINT incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	srvHandle.ptr += incrementSize;
+
+	// シェーダリソースビュー設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc4{};
+	srvDesc4.Format = textureResourceDesc4.Format;
+	srvDesc4.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc4.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc4.Texture2D.MipLevels = textureResourceDesc4.MipLevels;
+
+	// ハンドルの指す位置にシェーダーリソースビュー作成
+	device->CreateShaderResourceView(texBuff4.Get(), &srvDesc4, srvHandle);
+
+	//5つ目
+
+	//デスクリプタ 一つハンドルを進める
+	//UINT incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	srvHandle.ptr += incrementSize;
+
+	// シェーダリソースビュー設定
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc5{};
+	srvDesc5.Format = textureResourceDesc5.Format;
+	srvDesc5.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc5.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc5.Texture2D.MipLevels = textureResourceDesc5.MipLevels;
+
+	// ハンドルの指す位置にシェーダーリソースビュー作成
+	device->CreateShaderResourceView(texBuff5.Get(), &srvDesc5, srvHandle);
 
 
 
@@ -1276,6 +1743,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//---------------カメラ-------------
 
 		if (scene == 0) {
+
+
+			//タイトル画像変換
+
+			titleCoolTimer++;
+			if (titleCoolTimer >= titleCoolTime) {
+				titleCoolTimer = 0;
+				if (titleNum != 2) {
+					titleNum++;
+				}
+				else {
+					titleNum = 0;
+				}
+			}
 
 		}
 		else if (scene == 1) {
@@ -1351,14 +1832,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					}
 
 					if (paperObj.type[i] == 0) {
-						paperCircleObjs[i].position.z = 1000;
-						paperCircleObjs[i].position.x = 1000;
-						paperCircleObjs[i].position.y = 1000;
+						paperCircleObjs[i].position.z = -1000;
+						paperCircleObjs[i].position.x = -1000;
+						paperCircleObjs[i].position.y = -1000;
 					}
 					else {
-						paperAirplaneObjs[i].position.z = 1000;
-						paperAirplaneObjs[i].position.x = 1000;
-						paperAirplaneObjs[i].position.y = 1000;
+						paperAirplaneObjs[i].position.z = -1000;
+						paperAirplaneObjs[i].position.x = -1000;
+						paperAirplaneObjs[i].position.y = -1000;
 					}
 
 				}
@@ -1439,12 +1920,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			}
 
-			if (input->PushKey(DIK_1)) {
-				cameramode = 1;
-			}
-			else if (input->PushKey(DIK_2)) {
-				cameramode = 2;
-			}
+			//if (input->PushKey(DIK_1)) {
+			//	cameramode = 1;
+			//}
+			//else if (input->PushKey(DIK_2)) {
+			//	cameramode = 2;
+			//}
 
 			//地面についたらshotを増やす,以前に落ちた弾は除外
 
@@ -1503,7 +1984,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		if (cameramode == 0) {
 			//視点座標
-			eye = { 0,30,-30 };
+			eye = { 0,20,-30 };
 			target = { 0, 0,0 };
 
 
@@ -1531,7 +2012,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		}
 		else if (cameramode == 2) {
 			//視点座標
-			eye = { 500,0,3 };
+			eye = { 50,0,3 };
 			target = { 30, 0,0 };
 
 			if (paperObj.type[touchPaperNum] == 0) {
@@ -1579,6 +2060,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			scene = 3;
 			isLand = 0;
 
+			//乱数シード生成器
+			std::random_device seed_gen;
+			//メルセンヌ・ツイスター
+			std::mt19937_64 engine(seed_gen());
+
+			//乱数範囲(くじ用)
+			std::uniform_real_distribution<float> kuziDist(0, 5.9);
+
+			//乱数範囲(くじ内容用)
+			std::uniform_real_distribution<float> kuziCommentDist(0, 2.9);
+
+			//くじ抽選
+			kuzi = kuziDist(engine);
+
+			//くじコメント抽選
+			kuziComment = kuziCommentDist(engine);
+
+			kuziComment = (kuzi * 3) + kuziComment;
+
+			SpriteUpdate(kuziSprite[kuzi], spriteCommon);
+
+			SpriteUpdate(kuziCommentSprite[kuziComment], spriteCommon);
+
 		}
 		else if (scene == 3) {
 			if (input->TriggerKey(DIK_SPACE)) {
@@ -1597,34 +2101,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					playerBulletObj[i].position.y = 1000;
 				}
 
-			}
-
-			if (paperObj.type[beginshot[0]] == 0) {
-
-				if (paperAirplaneObjs[beginshot[0]].position.z > paperAirplaneObjs[beginshot[1]].position.z) {
-					highScore = paperAirplaneObjs[beginshot[0]].position.z;
-				}
-				else {
-					paperAirplaneObjs[beginshot[1]].position.z;
-				}
-
-				if (paperAirplaneObjs[beginshot[2]].position.z > highScore) {
-					highScore = paperAirplaneObjs[beginshot[2]].position.z;
+				for (int i = 0; i < 3; i++) {
+					score[i] = 0;
 				}
 			}
-			else {
-				if (paperCircleObjs[beginshot[0]].position.z > paperCircleObjs[beginshot[1]].position.z) {
-					highScore = paperCircleObjs[beginshot[0]].position.z;
-				}
-				else {
-					paperCircleObjs[beginshot[1]].position.z;
-				}
-
-				if (paperCircleObjs[beginshot[2]].position.z > highScore) {
-					highScore = paperCircleObjs[beginshot[2]].position.z;
-				}
-			}
-
 
 		}
 
@@ -1639,11 +2119,112 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		//------------スプライト-------------
 
-		sprite.rotation = 45;
-		sprite.position = {1280/2,720/2,0};
+		//sprite.rotation = 45;
 
-		SpriteUpdate(sprite,spriteCommon);
+		//パワーゲージUI
+		//powerGaugeInSprite.position.x = powerGaugeFlameSprite.position.x + (playerObj.windPower * 58) + 7;
 
+		powerGaugeInSprite.position.x = powerGaugeFlameSprite.position.x + 7;
+		powerGaugeInSprite.position.y = powerGaugeFlameSprite.position.y + 7;
+		SpriteUpdate(powerGaugeInSprite, spriteCommon);
+
+		powerGaugeInSprite.size.x = (playerObj.windPower * 60);
+		SpriteTransferVertexBuffer(powerGaugeInSprite);
+
+		SpriteUpdate(powerGaugeFlameSprite, spriteCommon);
+
+		clearSprite.position.x = WinApp::window_width / 4;
+		SpriteUpdate(clearSprite, spriteCommon);
+		//操作説明スプライト
+		ruleSprite.position.x = 220;
+		ruleSprite.position.y = 550;
+		SpriteUpdate(ruleSprite, spriteCommon);
+
+		//スコア
+
+		if (scene == 2) { //スコアをshotごとに取る
+			if (paperObj.type[touchPaperNum] == 0) {
+				score[shot] = paperAirplaneObjs[touchPaperNum].position.z;
+			}
+			else {
+				score[shot] = paperCircleObjs[touchPaperNum].position.z;
+			}
+		}
+		else if (scene == 3) { //ハイスコア算出
+
+			if (paperObj.type[beginshot[0]] == 0) {
+				highScore = paperAirplaneObjs[beginshot[0]].position.z;
+			}
+			else {
+				highScore = paperCircleObjs[beginshot[0]].position.z;
+			}
+
+			if (paperObj.type[beginshot[1]] == 0) {
+				if (paperAirplaneObjs[beginshot[1]].position.z > highScore) {
+					highScore = paperAirplaneObjs[beginshot[1]].position.z;
+				}
+			}
+			else {
+				if (paperCircleObjs[beginshot[1]].position.z > highScore) {
+					highScore = paperCircleObjs[beginshot[1]].position.z;
+				}
+			}
+
+			if (paperObj.type[beginshot[2]] == 0) {
+				if (paperAirplaneObjs[beginshot[2]].position.z > highScore) {
+					highScore = paperAirplaneObjs[beginshot[2]].position.z;
+				}
+			}
+			else {
+				if (paperCircleObjs[beginshot[2]].position.z > highScore) {
+					highScore = paperCircleObjs[beginshot[2]].position.z;
+				}
+			}
+
+			scoreSprite[3][0].texNumber = (highScore / 1000) + 10;
+			scoreSprite[3][1].texNumber = (highScore / 100) + 10;
+			scoreSprite[3][2].texNumber = (highScore / 10 % 10) + 10;
+			scoreSprite[3][3].texNumber = (highScore % 10) + 10;
+
+			if (scoreSprite[3][1].texNumber >= 10) {
+				scoreSprite[3][1].texNumber - 10;
+			}
+		}
+
+		//スコアをセット
+		if (shot != 3) {
+			scoreSprite[shot][0].texNumber = (score[shot] / 1000) + 10;
+			scoreSprite[shot][1].texNumber = (score[shot] / 100) + 10;
+			scoreSprite[shot][2].texNumber = (score[shot] / 10 % 10) + 10;
+			scoreSprite[shot][3].texNumber = (score[shot] % 10) + 10;
+
+			if (scoreSprite[shot][1].texNumber >= 10) {
+				scoreSprite[shot][1].texNumber - 10;
+			}
+		}
+		if (scene == 1 || scene == 2) {
+			//座標と更新
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					if (shot == j) {
+						scoreSprite[j][i].position.x = 500 + ((i + 1) * 64);
+						scoreSprite[j][i].position.y = 100;
+					}
+					else {
+						scoreSprite[j][i].position.x = 0 + ((i) * 64);
+						scoreSprite[j][i].position.y = 0 + +(j * 64);
+					}
+
+					if (j == 3) {
+						scoreSprite[j][i].position.x = 450 + ((i + 1) * 64);
+						scoreSprite[j][i].position.y = 460;
+					}
+
+					SpriteUpdate(scoreSprite[j][i], spriteCommon);
+
+				}
+			}
+		}
 		//------------当たり判定---------------
 
 		if (scene == 1 && paperObj.flag >= 3) {
@@ -1696,6 +2277,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 #pragma endregion
 		}
+
+		UpdateObject3d(&groundObj, matView, matProjection);
 
 		//更新処理-ここまで
 
@@ -1772,16 +2355,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//	DrawObject3d(&object3ds[i], commandList, vbView, ibView, _countof(indices));
 		//}
 
-		////自機描画
-		//DrawObject3d(&playerObj, commandList, vbView, ibView, _countof(indices));
+		incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		DrawObject3d(&groundObj, commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 
-		if (scene == 1 || scene == 2 || scene == 3) {
+		////自機描画
+
+		if (scene == 1 || scene == 2) {
 
 			if (scene != 2) {
+				incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				PlayerDraw(&playerObj, commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 				if (playerObj.mode == 3 && shot <= 2) {
 					if (playerBulletObj[shot].isDead_ == false) {
-						PlayerBulletDraw(&playerBulletObj[shot], commandList, vbView, ibView, _countof(indices));
+						incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+						PlayerBulletDraw(&playerBulletObj[shot], commandList, vbView, ibView, _countof(indices), srvGpuHandle, incrementSize);
 					}
 				}
 			}
@@ -1806,8 +2393,62 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		//スプライト共通コマンド
 		SpriteCommonBeginDraw(commandList.Get(), spriteCommon, srvHeap.Get());
 
-		//スプライト描画
-		SpriteDraw(sprite,commandList.Get(),spriteCommon,device.Get());
+		////スプライト描画
+		if (scene == 0) {
+			//タイトル
+			SpriteDraw(titleSprite[titleNum], commandList.Get(), spriteCommon, device.Get());
+		}
+		else if (scene == 3) {
+			//クリア
+			SpriteDraw(clearSprite, commandList.Get(), spriteCommon, device.Get());
+		}
+
+		//UI
+
+		if (scene == 1) {
+			//パワーゲージ
+			SpriteDraw(powerGaugeFlameSprite, commandList.Get(), spriteCommon, device.Get());
+			SpriteDraw(powerGaugeInSprite, commandList.Get(), spriteCommon, device.Get());
+
+			//操作説明
+			if (shot == 0) {
+				SpriteDraw(ruleSprite, commandList.Get(), spriteCommon, device.Get());
+			}
+		}
+
+		//スコア
+		if (scene == 1) {
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					if (j < shot && shot != 0) {
+						if (j != 3) {
+							SpriteDraw(scoreSprite[j][i], commandList.Get(), spriteCommon, device.Get());
+						}
+					}
+				}
+			}
+		}
+		else if (scene == 2) {
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					if (j <= shot) {
+						if (j != 3) {
+							SpriteDraw(scoreSprite[j][i], commandList.Get(), spriteCommon, device.Get());
+						}
+					}
+				}
+			}
+
+		}
+		else if (scene == 3) {
+			for (int i = 0; i < 4; i++) {
+				SpriteDraw(scoreSprite[3][i], commandList.Get(), spriteCommon, device.Get());
+			}
+			//くじ
+
+			SpriteDraw(kuziSprite[kuzi], commandList.Get(), spriteCommon, device.Get());
+			SpriteDraw(kuziCommentSprite[kuziComment], commandList.Get(), spriteCommon, device.Get());
+		}
 
 		// ４．描画コマンドここまで
 
@@ -1918,7 +2559,10 @@ void UpdateObject3d(Object3d* object, XMMATRIX& matView, XMMATRIX& matProjection
 }
 
 //オブジェクト描画処理
-void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+void DrawObject3d(Object3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += (incrementSize * 4);
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// 頂点バッファビューの設定コマンド
 	commandList->IASetVertexBuffers(0, 1, &vbView);
@@ -2018,7 +2662,7 @@ void PlayerUpdate(Input* input_, PlayerObject3d* object, XMMATRIX& matView, XMMA
 //描画
 void PlayerDraw(PlayerObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
 
-	srvGpuHandle.ptr += incrementSize;
+	srvGpuHandle.ptr += (incrementSize * 2);
 	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// 頂点バッファビューの設定コマンド
@@ -2258,7 +2902,10 @@ void PlayerBulletUpdate(PlayerBulletObject3d* object, XMMATRIX& matView, XMMATRI
 	object->constMapTransform->mat = object->matWorld * matView * matProjection;
 }
 
-void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices) {
+void PlayerBulletDraw(PlayerBulletObject3d* object, ComPtr<ID3D12GraphicsCommandList> commandList, D3D12_VERTEX_BUFFER_VIEW& vbView, D3D12_INDEX_BUFFER_VIEW& ibView, UINT numIndices, D3D12_GPU_DESCRIPTOR_HANDLE srvGpuHandle, UINT incrementSize) {
+
+	srvGpuHandle.ptr += (incrementSize * 3);
+	commandList->SetGraphicsRootDescriptorTable(1, srvGpuHandle);
 
 	// 頂点バッファビューの設定コマンド
 	commandList->IASetVertexBuffers(0, 1, &vbView);
@@ -2605,11 +3252,11 @@ void PaperAirplaneSet(float windPower, Vector3 fanTrans, PaperAirplaneObject3d* 
 	}
 
 	//減速率を計算,角度が0(まっすぐ)に近いほど減速率は少ない
-	if (object->position.y < PI) {
-		object->decelerationRate = (object->position.y);
+	if (object->rotation.y < PI) {
+		object->decelerationRate = (object->rotation.y);
 	}
 	else {
-		object->decelerationRate = (object->position.y - PI);
+		object->decelerationRate = (object->rotation.y - PI);
 
 		if (object->decelerationRate < (PI / 2)) {
 			object->decelerationRate = (PI - object->decelerationRate);
@@ -3077,7 +3724,7 @@ PipelineSet SpriteCreateGraphicsPipeline(ID3D12Device* dev) {
 
 	// デスクリプタレンジの設定
 	CD3DX12_DESCRIPTOR_RANGE descriptorRange{};
-	descriptorRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV,1,0);
+	descriptorRange.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	//descriptorRange.NumDescriptors = 1;         //一度の描画に使うテクスチャが1枚なので1
 	//descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	//descriptorRange.BaseShaderRegister = 0;     //テクスチャレジスタ0番
@@ -3103,8 +3750,8 @@ PipelineSet SpriteCreateGraphicsPipeline(ID3D12Device* dev) {
 
 	CD3DX12_ROOT_PARAMETER rootParams[2];
 	rootParams[0].InitAsConstantBufferView(0);
-	rootParams[1].InitAsDescriptorTable(1,&descriptorRange,D3D12_SHADER_VISIBILITY_ALL);
-		 
+	rootParams[1].InitAsDescriptorTable(1, &descriptorRange, D3D12_SHADER_VISIBILITY_ALL);
+
 	// テクスチャサンプラーの設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc{};
 	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;                 //横繰り返し（タイリング）
@@ -3240,8 +3887,8 @@ Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height) {
 	//頂点バッファへのデータ転送
 	VertexPosUv* vertMap = nullptr;
 	result = sprite.vertBuff->Map(0, nullptr, (void**)&vertMap);
-	memcpy(vertMap,vertices,sizeof(vertices));
-	sprite.vertBuff->Unmap(0,nullptr);
+	memcpy(vertMap, vertices, sizeof(vertices));
+	sprite.vertBuff->Unmap(0, nullptr);
 
 	// 頂点バッファビューの作成
 	// GPU仮想アドレス
@@ -3270,12 +3917,12 @@ Sprite SpriteCreate(ID3D12Device* dev, int window_width, int window_height) {
 	// 定数バッファにデータ転送
 	ConstBufferData* constMap = nullptr;
 	result = sprite.constBuff->Map(0, nullptr, (void**)&constMap); // マッピング
-	constMap->color = XMFLOAT4(1,1,1,1);
+	constMap->color = XMFLOAT4(1, 1, 1, 1);
 	assert(SUCCEEDED(result));
 
 	//平行投影行列
-	constMap->mat = XMMatrixOrthographicOffCenterLH(0.0f, window_width, window_height,0.0f,0.0f,1.0f);
-	sprite.constBuff->Unmap(0,nullptr);
+	constMap->mat = XMMatrixOrthographicOffCenterLH(0.0f, window_width, window_height, 0.0f, 0.0f, 1.0f);
+	sprite.constBuff->Unmap(0, nullptr);
 
 	return sprite;
 }
@@ -3290,26 +3937,26 @@ void SpriteCommonBeginDraw(ID3D12GraphicsCommandList* cmdList, const SpriteCommo
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP); // 三角形リスト
 
 	//テクスチャ用でスクリプタヒープの設定
-	ID3D12DescriptorHeap* ppHeaps[] = { spriteCommon.descHeap.Get()};
+	ID3D12DescriptorHeap* ppHeaps[] = { spriteCommon.descHeap.Get() };
 	cmdList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 }
 
 //スプライト単体描画
 
-void SpriteDraw(const Sprite& sprite, ID3D12GraphicsCommandList* cmdList, const SpriteCommon& spriteCommon,ID3D12Device* dev) {
+void SpriteDraw(const Sprite& sprite, ID3D12GraphicsCommandList* cmdList, const SpriteCommon& spriteCommon, ID3D12Device* dev) {
 
 	// 頂点バッファの設定コマンド
 	cmdList->IASetVertexBuffers(0, 1, &sprite.vbView);
 
 	// 定数バッファ(CBV)の設定コマンド
-	cmdList->SetGraphicsRootConstantBufferView(0,sprite.constBuff->GetGPUVirtualAddress());
+	cmdList->SetGraphicsRootConstantBufferView(0, sprite.constBuff->GetGPUVirtualAddress());
 
 	//シェーダーリソースビューをセット
-	cmdList->SetGraphicsRootDescriptorTable(1,CD3DX12_GPU_DESCRIPTOR_HANDLE(spriteCommon.descHeap->GetGPUDescriptorHandleForHeapStart(),
-	sprite.texNumber,dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)));
+	cmdList->SetGraphicsRootDescriptorTable(1, CD3DX12_GPU_DESCRIPTOR_HANDLE(spriteCommon.descHeap->GetGPUDescriptorHandleForHeapStart(),
+		sprite.texNumber, dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)));
 
 	//ポリゴンの描画
-	cmdList->DrawInstanced(4,1,0,0);
+	cmdList->DrawInstanced(4, 1, 0, 0);
 
 }
 
@@ -3323,7 +3970,7 @@ SpriteCommon SpriteCommonCreate(ID3D12Device* dev, int window_width, int window_
 	spriteCommon.pipelineSet = SpriteCreateGraphicsPipeline(dev);
 
 	//平行投影行列生成
-	spriteCommon.matProjrction = XMMatrixOrthographicOffCenterLH(0.0f,(float)window_width,(float)window_height,0.0f,0.0f,1.0f);
+	spriteCommon.matProjrction = XMMatrixOrthographicOffCenterLH(0.0f, (float)window_width, (float)window_height, 0.0f, 0.0f, 1.0f);
 
 	//HRESULT result = S_FALSE;
 
@@ -3344,14 +3991,14 @@ void SpriteUpdate(Sprite& sprite, const SpriteCommon& spriteCommon) {
 
 	sprite.matWorld *= XMMatrixRotationZ(XMConvertToRadians(sprite.rotation));
 
-	sprite.matWorld *= XMMatrixTranslation(sprite.position.x,sprite.position.y,sprite.position.z);
+	sprite.matWorld *= XMMatrixTranslation(sprite.position.x, sprite.position.y, sprite.position.z);
 
 
 	// 定数バッファにデータ転送
 	ConstBufferData* constMap = nullptr;
 	HRESULT result = sprite.constBuff->Map(0, nullptr, (void**)&constMap); // マッピング
 	constMap->mat = sprite.matWorld * spriteCommon.matProjrction;
-	sprite.constBuff->Unmap(0,nullptr);
+	sprite.constBuff->Unmap(0, nullptr);
 }
 
 void SpriteCommonLoadTexture(SpriteCommon& spriteCommon, UINT texnumber, const wchar_t* filename, ID3D12Device* dev) {
@@ -3423,4 +4070,29 @@ void SpriteCommonLoadTexture(SpriteCommon& spriteCommon, UINT texnumber, const w
 	);
 
 	//return S_OK;
+}
+
+void SpriteTransferVertexBuffer(const Sprite& sprite) {
+
+	HRESULT result = S_FALSE;
+
+	//頂点データ
+	VertexPosUv vertices[] = {
+		{{},{0.0f,1.0f}},
+		{{},{0.0f,0.0f}},
+		{{},{1.0f,1.0f}},
+		{{},{1.0f,0.0f}},
+	};
+
+	enum { LB, LT, RB, RT };
+
+	vertices[LB].pos = { 0.0f,sprite.size.y,0.0f };
+	vertices[LT].pos = { 0.0f,0.0f,0.0f };
+	vertices[RB].pos = { sprite.size.x,sprite.size.y,0.0f };
+	vertices[RT].pos = { sprite.size.x,0.0f,0.0f };
+
+	VertexPosUv* vertMap = nullptr;
+	result = sprite.vertBuff->Map(0, nullptr, (void**)&vertMap);
+	memcpy(vertMap, vertices, sizeof(vertices));
+	sprite.vertBuff->Unmap(0, nullptr);
 }
